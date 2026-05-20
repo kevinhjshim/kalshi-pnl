@@ -22,191 +22,300 @@ SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settin
 # ── Theme definitions ─────────────────────────────────────────────────────────
 THEMES: dict[str, dict] = {
     "Dark": {
-        "bg":      "#111827",
-        "surface": "#1F2937",
-        "card":    "#1F2937",
-        "border":  "#374151",
-        "border2": "#4B5563",
-        "text":    "#F9FAFB",
-        "muted":   "#9CA3AF",
-        "soft":    "#D1D5DB",
-        "accent":  "#818CF8",
-        "profit":  "#34D399",
+        "bg":      "#050506",
+        "surface": "#08080B",
+        "card":    "#0F0F14",
+        "border":  "rgba(255,255,255,0.06)",
+        "border2": "rgba(255,255,255,0.11)",
+        "text":    "#EDEDEF",
+        "muted":   "#8A8F98",
+        "soft":    "#C4C9D4",
+        "accent":  "#5E6AD2",
+        "profit":  "#2DD4A2",
         "loss":    "#F87171",
         "line":    "#67E8F9",
-        "warn":    "#FCD34D",
+        "warn":    "#F59E0B",
     },
     "Light": {
-        "bg":      "#F9FAFB",
-        "surface": "#F3F4F6",
+        "bg":      "#FAFAF9",
+        "surface": "#F4F4F1",
         "card":    "#FFFFFF",
-        "border":  "#E5E7EB",
-        "border2": "#D1D5DB",
-        "text":    "#111827",
-        "muted":   "#6B7280",
-        "soft":    "#374151",
-        "accent":  "#6366F1",
+        "border":  "rgba(0,0,0,0.07)",
+        "border2": "rgba(0,0,0,0.13)",
+        "text":    "#1A1A22",
+        "muted":   "#6B7080",
+        "soft":    "#383A47",
+        "accent":  "#5E6AD2",
         "profit":  "#059669",
         "loss":    "#DC2626",
-        "line":    "#0284C7",
+        "line":    "#0EA5E9",
         "warn":    "#D97706",
     },
 }
 
 
 def build_css(T: dict) -> str:
+    is_dark = T["bg"] == "#050506"
+
+    # Radial gradient for dark; flat for light
+    if is_dark:
+        page_bg = (
+            f"radial-gradient(ellipse at 50% 0%, #0D0D1A 0%, {T['bg']} 55%, #020203 100%)"
+        )
+        blob_css = f"""
+@keyframes blob1 {{
+    0%, 100% {{ transform: translateX(-50%) translateY(0px) scale(1); }}
+    40%  {{ transform: translateX(-50%) translateY(-50px) scale(1.04); }}
+    70%  {{ transform: translateX(-50%) translateY(22px) scale(0.97); }}
+}}
+@keyframes blob2 {{
+    0%, 100% {{ transform: translateX(0px) translateY(0px) scale(1); }}
+    50%  {{ transform: translateX(-38px) translateY(-32px) scale(1.05); }}
+}}
+@keyframes blob3 {{
+    0%, 100% {{ transform: translateX(0px) translateY(0px) scale(1); }}
+    60%  {{ transform: translateX(28px) translateY(28px) scale(0.96); }}
+}}
+.bg-blob-1 {{
+    position: fixed; top: -28%; left: 50%;
+    width: 1100px; height: 750px; border-radius: 50%;
+    background: radial-gradient(ellipse, {T['accent']}1A 0%, transparent 70%);
+    filter: blur(110px); pointer-events: none; z-index: 0;
+    animation: blob1 14s ease-in-out infinite;
+}}
+.bg-blob-2 {{
+    position: fixed; top: 25%; left: -18%;
+    width: 650px; height: 520px; border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(110,70,210,0.10) 0%, transparent 70%);
+    filter: blur(130px); pointer-events: none; z-index: 0;
+    animation: blob2 19s ease-in-out infinite 3s;
+}}
+.bg-blob-3 {{
+    position: fixed; bottom: -18%; right: -12%;
+    width: 540px; height: 460px; border-radius: 50%;
+    background: radial-gradient(ellipse, rgba(50,110,220,0.08) 0%, transparent 70%);
+    filter: blur(120px); pointer-events: none; z-index: 0;
+    animation: blob3 22s ease-in-out infinite 6s;
+}}
+"""
+    else:
+        page_bg = T["bg"]
+        blob_css = ""
+
     return f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+{blob_css}
+
+/* ── Keyframes ── */
+@keyframes shimmer {{
+    from {{ background-position: -200% center; }}
+    to   {{ background-position:  200% center; }}
+}}
 
 /* ── Selection ── */
 ::selection {{ background: {T['accent']}44; color: {T['text']}; }}
 
 /* ── Base ── */
 html, body, .stApp, [data-testid="stAppViewContainer"] {{
-    background-color: {T['bg']} !important;
+    background: {page_bg} !important;
     color: {T['text']};
-    font-family: 'Bricolage Grotesque', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
 }}
 [data-testid="stHeader"] {{
-    background-color: {T['bg']} !important;
+    background: {T['bg']}F0 !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
     border-bottom: 1px solid {T['border']};
 }}
-p, li, span, div {{ font-family: 'Bricolage Grotesque', sans-serif; }}
+p, li, span, div {{ font-family: 'Inter', system-ui, sans-serif; }}
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {{
-    background-color: {T['surface']} !important;
+    background: {T['surface']} !important;
     border-right: 1px solid {T['border']};
 }}
 [data-testid="stSidebar"] * {{ color: {T['text']}; }}
 [data-testid="collapsedControl"] {{
-    background-color: {T['surface']} !important;
+    background: {T['surface']} !important;
     border-right: 1px solid {T['border']};
 }}
 
 /* ── Buttons ── */
 .stButton > button {{
-    background-color: transparent;
-    color: {T['soft']};
-    border: 1px solid {T['border2']};
-    border-radius: 6px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.78rem;
-    transition: all 0.12s ease;
+    background: rgba(255,255,255,0.04) !important;
+    color: {T['soft']} !important;
+    border: 1px solid {T['border2']} !important;
+    border-radius: 8px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06) !important;
+    transition: all 0.2s cubic-bezier(0.16,1,0.3,1) !important;
 }}
 .stButton > button:hover {{
-    border-color: {T['accent']};
-    color: {T['accent']};
-    background-color: {T['accent']}18;
+    background: rgba(255,255,255,0.08) !important;
+    color: {T['text']} !important;
+    transform: translateY(-1px) !important;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.09),
+                0 4px 16px rgba(0,0,0,0.25) !important;
+}}
+.stButton > button:active {{
+    transform: scale(0.98) translateY(0px) !important;
 }}
 .stButton > button[kind="primary"] {{
-    background-color: {T['accent']};
-    border-color: {T['accent']};
-    color: #FFFFFF;
-    font-weight: 600;
+    background: {T['accent']} !important;
+    border: 1px solid {T['accent']}CC !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    box-shadow: 0 0 0 1px {T['accent']}88,
+                0 4px 14px {T['accent']}44,
+                inset 0 1px 0 rgba(255,255,255,0.20) !important;
 }}
-.stButton > button[kind="primary"]:hover {{ filter: brightness(1.1); }}
+.stButton > button[kind="primary"]:hover {{
+    background: #6872D9 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 0 0 1px {T['accent']}AA,
+                0 6px 22px {T['accent']}55,
+                inset 0 1px 0 rgba(255,255,255,0.25) !important;
+}}
 
 /* ── Inputs ── */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea {{
     background-color: {T['card']} !important;
     border: 1px solid {T['border2']} !important;
-    border-radius: 6px !important;
+    border-radius: 8px !important;
     color: {T['text']} !important;
     -webkit-text-fill-color: {T['text']} !important;
     caret-color: {T['text']} !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.82rem !important;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.12) !important;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
 }}
 .stTextInput > div > div > input:focus,
 .stTextArea > div > div > textarea:focus {{
     border-color: {T['accent']} !important;
-    box-shadow: 0 0 0 2px {T['accent']}28 !important;
+    box-shadow: 0 0 0 3px {T['accent']}22,
+                inset 0 1px 3px rgba(0,0,0,0.12) !important;
     outline: none !important;
 }}
-/* Fix autofill chrome white flash */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-textarea:-webkit-autofill {{
+input:-webkit-autofill, input:-webkit-autofill:hover,
+input:-webkit-autofill:focus, textarea:-webkit-autofill {{
     -webkit-box-shadow: 0 0 0 1000px {T['card']} inset !important;
     -webkit-text-fill-color: {T['text']} !important;
     caret-color: {T['text']} !important;
 }}
-/* Password browser overlay button */
 input::-webkit-credentials-auto-fill-button,
 input::-webkit-strong-password-auto-fill-button,
 input::-webkit-contacts-auto-fill-button {{
-    visibility: hidden;
-    pointer-events: none;
-    position: absolute;
-    right: 0;
+    visibility: hidden; pointer-events: none;
 }}
-/* Input labels */
+[data-testid="InputInstructions"] {{ display: none !important; }}
 .stTextInput label p, .stTextArea label p,
 [data-testid="stWidgetLabel"] p {{
     color: {T['muted']} !important;
-    font-size: 0.72rem !important;
-    font-family: 'JetBrains Mono', monospace !important;
-    letter-spacing: 0.04em;
+    font-size: 0.68rem !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
 }}
-/* Placeholder */
 .stTextInput input::placeholder, .stTextArea textarea::placeholder {{
-    color: {T['muted']} !important;
+    color: {T['muted']}88 !important;
 }}
 
 /* ── Selectbox ── */
 .stSelectbox > div > div {{
-    background-color: {T['card']} !important;
+    background: {T['card']} !important;
     border: 1px solid {T['border2']} !important;
-    border-radius: 6px !important;
+    border-radius: 8px !important;
     color: {T['text']} !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.82rem !important;
 }}
 
 /* ── Radio ── */
-.stRadio label p {{ color: {T['soft']} !important; font-size: 0.82rem !important; }}
-.stRadio [role="radiogroup"] label {{ cursor: pointer; }}
+.stRadio label p {{
+    color: {T['soft']} !important;
+    font-size: 0.82rem !important;
+    font-family: 'Inter', sans-serif !important;
+}}
+.stRadio [role="radiogroup"] label {{
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    cursor: pointer;
+}}
+.stRadio [role="radiogroup"] label p {{
+    margin: 0 !important;
+    line-height: 1 !important;
+    padding-top: 0 !important;
+}}
 
 /* ── Tabs ── */
 .stTabs [data-baseweb="tab-list"] {{
     background: transparent;
     border-bottom: 1px solid {T['border']};
+    gap: 0;
 }}
 .stTabs [data-baseweb="tab"] {{
     background: transparent;
     color: {T['muted']};
     border-bottom: 2px solid transparent;
-    padding: 10px 18px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    padding: 10px 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    transition: color 0.15s ease;
+}}
+.stTabs [data-baseweb="tab"]:hover {{
+    color: {T['soft']} !important;
+    background: rgba(255,255,255,0.03) !important;
 }}
 .stTabs [aria-selected="true"] {{
     background: transparent !important;
-    color: {T['accent']} !important;
+    color: {T['text']} !important;
     border-bottom-color: {T['accent']} !important;
 }}
 .stTabs [data-baseweb="tab-panel"] {{ padding-top: 20px; }}
 
 /* ── Expanders ── */
 [data-testid="stExpander"] {{
-    background-color: {T['card']};
+    background: {T['card']};
     border: 1px solid {T['border']};
-    border-radius: 6px;
+    border-radius: 10px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }}
-[data-testid="stExpander"] summary {{ color: {T['soft']}; font-size: 0.85rem; }}
+[data-testid="stExpander"] summary {{
+    color: {T['soft']};
+    font-size: 0.85rem;
+    font-family: 'Inter', sans-serif;
+}}
+
+/* ── Metric card hover ── */
+.metric-card {{
+    transition: transform 0.25s cubic-bezier(0.16,1,0.3,1),
+                box-shadow 0.25s cubic-bezier(0.16,1,0.3,1) !important;
+    cursor: default;
+}}
+.metric-card:hover {{
+    transform: translateY(-3px) !important;
+    box-shadow: 0 0 0 1px {T['border2']},
+                0 12px 36px rgba(0,0,0,0.45),
+                0 0 60px {T['accent']}0E !important;
+}}
 
 /* ── Divider ── */
 hr {{ border-color: {T['border']} !important; margin: 14px 0; }}
 
 /* ── Code ── */
 code {{
-    background-color: {T['surface']} !important;
+    background: {T['card']} !important;
     color: {T['accent']} !important;
     border: 1px solid {T['border']} !important;
     border-radius: 4px;
@@ -217,47 +326,66 @@ code {{
 
 /* ── Alerts ── */
 [data-testid="stAlert"] {{
-    background-color: {T['card']} !important;
+    background: {T['card']} !important;
     border: 1px solid {T['border2']} !important;
-    border-radius: 6px;
+    border-radius: 8px;
     color: {T['soft']} !important;
+    font-family: 'Inter', sans-serif !important;
 }}
 
 /* ── Loading spinner ── */
 .stSpinner > div {{ border-top-color: {T['accent']} !important; }}
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar {{ width: 5px; height: 5px; }}
-::-webkit-scrollbar-track {{ background: {T['bg']}; }}
-::-webkit-scrollbar-thumb {{ background: {T['border2']}; border-radius: 3px; }}
-::-webkit-scrollbar-thumb:hover {{ background: {T['muted']}; }}
-
 /* ── Connect card ── */
 .connect-card {{
     background: {T['card']};
     border: 1px solid {T['border']};
-    border-top: 3px solid {T['accent']};
-    border-radius: 10px;
-    padding: 28px 30px 24px;
+    border-radius: 12px;
+    padding: 28px 30px 26px;
+    box-shadow: 0 0 0 1px {T['border']},
+                0 4px 24px rgba(0,0,0,0.3);
+    position: relative;
+    overflow: hidden;
+}}
+.connect-card::before {{
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(to right, transparent, {T['accent']}66, transparent);
 }}
 
-/* ── Hide "Press Enter to apply" hint (overlaps typed text) ── */
-[data-testid="InputInstructions"] {{ display: none !important; }}
+/* ── Security / preview cards ── */
+.info-card {{
+    background: {T['card']};
+    border: 1px solid {T['border']};
+    border-radius: 12px;
+    padding: 22px 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    position: relative;
+    overflow: hidden;
+}}
 
-/* ── Radio alignment fix ── */
-.stRadio [role="radiogroup"] label {{
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    line-height: 1 !important;
-}}
-.stRadio [role="radiogroup"] label p {{
-    margin: 0 !important;
-    line-height: 1 !important;
-    padding-top: 0 !important;
-}}
+/* ── Scrollbar ── */
+::-webkit-scrollbar {{ width: 4px; height: 4px; }}
+::-webkit-scrollbar-track {{ background: transparent; }}
+::-webkit-scrollbar-thumb {{ background: {T['border2']}; border-radius: 2px; }}
+::-webkit-scrollbar-thumb:hover {{ background: {T['muted']}; }}
 </style>
 """
+
+
+# ── Background blobs (dark theme only) ───────────────────────────────────────
+
+def render_bg_blobs(T: dict) -> str:
+    if T["bg"] != "#050506":
+        return ""
+    return (
+        '<div style="position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden">'
+        '<div class="bg-blob-1"></div>'
+        '<div class="bg-blob-2"></div>'
+        '<div class="bg-blob-3"></div>'
+        '</div>'
+    )
 
 
 # ── Settings persistence ──────────────────────────────────────────────────────
@@ -637,7 +765,7 @@ def keyword_match_count(df: pd.DataFrame, kw: str) -> int:
 def pnl_bar_chart(grouped: pd.DataFrame, x_col: str, title: str, T: dict) -> go.Figure:
     grouped = grouped.copy()
     grouped["cumulative"] = grouped["pnl"].cumsum()
-    mono = "JetBrains Mono, monospace"
+    mono = "Inter, system-ui, sans-serif"
 
     fig = go.Figure()
     for _, row in grouped.iterrows():
@@ -692,17 +820,32 @@ def metric_card(label: str, value: str, sub: str, T: dict,
     ac  = accent or T["accent"]
     vc  = value_color or T["text"]
     sub_html = (
-        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.7rem;'
-        f'color:{T["muted"]};margin-top:4px">{sub}</div>'
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.68rem;'
+        f'color:{T["muted"]};margin-top:6px;line-height:1.4">{sub}</div>'
     ) if sub else ""
     return (
-        f'<div style="background:{T["card"]};border:1px solid {T["border"]};'
-        f'border-top:2px solid {ac};border-radius:8px;padding:16px 18px 14px;height:100%">'
-        f'<div style="font-family:\'Bricolage Grotesque\',sans-serif;font-size:1.75rem;'
-        f'font-weight:700;color:{vc};line-height:1;letter-spacing:-0.02em">{value}</div>'
-        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.6rem;'
-        f'color:{T["muted"]};text-transform:uppercase;letter-spacing:0.12em;margin-top:8px">{label}</div>'
-        f'{sub_html}</div>'
+        # outer wrapper — the CSS class .metric-card adds hover transition
+        f'<div class="metric-card" style="'
+        f'background:{T["card"]};'
+        f'border:1px solid {T["border"]};'
+        f'border-radius:10px;'
+        f'padding:18px 20px 16px;'
+        f'height:100%;'
+        f'position:relative;'
+        f'overflow:hidden;'
+        f'box-shadow:0 0 0 1px {T["border"]},0 2px 16px rgba(0,0,0,0.22);">'
+        # gradient hairline at top
+        f'<div style="position:absolute;top:0;left:0;right:0;height:1px;'
+        f'background:linear-gradient(to right,transparent,{ac}77,transparent)"></div>'
+        # value
+        f'<div style="font-family:\'Inter\',sans-serif;font-size:1.6rem;'
+        f'font-weight:700;color:{vc};line-height:1;letter-spacing:-0.025em;margin-top:2px">{value}</div>'
+        # label
+        f'<div style="font-family:\'Inter\',sans-serif;font-size:0.58rem;'
+        f'color:{T["muted"]};text-transform:uppercase;letter-spacing:0.1em;'
+        f'font-weight:600;margin-top:10px">{label}</div>'
+        f'{sub_html}'
+        f'</div>'
     )
 
 
@@ -743,7 +886,7 @@ def html_table(df: pd.DataFrame, T: dict) -> str:
                 style = f"{base};color:{color}{weight};font-family:'JetBrains Mono',monospace"
             elif col == "Market":
                 style = (
-                    f"{base};color:{T['text']};font-family:'Bricolage Grotesque',sans-serif;"
+                    f"{base};color:{T['text']};font-family:'Inter',sans-serif;"
                     f"max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
                 )
             elif col == "Date":
@@ -822,9 +965,9 @@ def build_yearly_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def section_label(text: str, T: dict) -> None:
     st.markdown(
-        f"<p style='font-family:\"JetBrains Mono\",monospace;color:{T['soft']};"
-        f"font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;"
-        f"margin:0 0 6px'>{text}</p>",
+        f"<p style='font-family:\"Inter\",sans-serif;color:{T['muted']};"
+        f"font-size:0.6rem;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;"
+        f"margin:0 0 8px'>{text}</p>",
         unsafe_allow_html=True,
     )
 
@@ -854,6 +997,7 @@ def main() -> None:
     T = THEMES[theme_name]
 
     st.markdown(build_css(T), unsafe_allow_html=True)
+    st.markdown(render_bg_blobs(T), unsafe_allow_html=True)
 
     logged_in = bool(st.session_state.creds)
 
@@ -861,12 +1005,12 @@ def main() -> None:
     with st.sidebar:
         # Wordmark
         st.markdown(
-            f"<div style='padding:2px 0 10px'>"
-            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
-            f"font-size:1.1rem;font-weight:800;color:{T['text']};letter-spacing:-0.01em'>"
+            f"<div style='padding:4px 0 10px'>"
+            f"<div style='font-family:\"Inter\",sans-serif;"
+            f"font-size:1.05rem;font-weight:700;color:{T['text']};letter-spacing:-0.02em'>"
             f"Kalshi PnL</div>"
-            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.58rem;"
-            f"color:{T['muted']};letter-spacing:0.06em;margin-top:2px'>"
+            f"<div style='font-family:\"Inter\",sans-serif;font-size:0.58rem;"
+            f"font-weight:500;color:{T['muted']};letter-spacing:0.06em;margin-top:3px'>"
             f"PREDICTION MARKET TRACKER</div></div>",
             unsafe_allow_html=True,
         )
@@ -891,10 +1035,11 @@ def main() -> None:
             # ── Connected badge + logout ──
             st.markdown(
                 f"<div style='background:{T['card']};border:1px solid {T['border']};"
-                f"border-left:3px solid {T['profit']};border-radius:0 6px 6px 0;"
-                f"padding:8px 12px;margin-bottom:8px'>"
-                f"<span style='font-family:\"JetBrains Mono\",monospace;"
-                f"color:{T['profit']};font-size:0.72rem;letter-spacing:0.06em'>"
+                f"border-left:2px solid {T['profit']};border-radius:0 8px 8px 0;"
+                f"padding:9px 14px;margin-bottom:8px;"
+                f"box-shadow:0 0 0 1px {T['border']},0 2px 8px rgba(0,0,0,0.15)'>"
+                f"<span style='font-family:\"Inter\",sans-serif;"
+                f"color:{T['profit']};font-size:0.72rem;font-weight:600'>"
                 f"● Connected</span></div>",
                 unsafe_allow_html=True,
             )
@@ -941,12 +1086,13 @@ def main() -> None:
                 badge_color = T["loss"] if count > 0 else T["muted"]
                 c1.markdown(
                     f"<div style='background:{T['card']};border:1px solid {T['border']};"
-                    f"border-left:2px solid {T['accent']};border-radius:0 4px 4px 0;"
-                    f"padding:5px 10px;margin-bottom:2px'>"
-                    f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.78rem;"
-                    f"color:{T['text']}'>{kw}</div>"
-                    f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.6rem;"
-                    f"color:{badge_color}'>"
+                    f"border-left:2px solid {T['accent']};border-radius:0 6px 6px 0;"
+                    f"padding:6px 10px;margin-bottom:2px;"
+                    f"box-shadow:0 1px 4px rgba(0,0,0,0.12)'>"
+                    f"<div style='font-family:\"Inter\",sans-serif;font-size:0.8rem;"
+                    f"font-weight:500;color:{T['text']}'>{kw}</div>"
+                    f"<div style='font-family:\"Inter\",sans-serif;font-size:0.62rem;"
+                    f"color:{badge_color};margin-top:2px'>"
                     f"{'no matches' if count == 0 else f'{count} trades excluded'}</div></div>",
                     unsafe_allow_html=True,
                 )
@@ -962,7 +1108,7 @@ def main() -> None:
 
             if not keywords:
                 st.markdown(
-                    f"<p style='font-family:\"JetBrains Mono\",monospace;"
+                    f"<p style='font-family:\"Inter\",sans-serif;"
                     f"color:{T['muted']};font-size:0.72rem;font-style:italic'>None set.</p>",
                     unsafe_allow_html=True,
                 )
@@ -980,32 +1126,32 @@ def main() -> None:
 
     # ── Pre-login main content ────────────────────────────────────────────────
     if not logged_in:
-        # Header row
+        # Header
         st.markdown(
-            f"<div style='padding:40px 0 6px'>"
-            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
-            f"font-size:1.6rem;font-weight:800;color:{T['text']};line-height:1.1;"
-            f"letter-spacing:-0.02em'>Kalshi PnL Dashboard</div>"
-            f"<p style='font-family:\"JetBrains Mono\",monospace;font-size:0.82rem;"
-            f"color:{T['muted']};margin-top:8px;line-height:1.6'>"
+            f"<div style='padding:48px 0 8px'>"
+            f"<div style='font-family:\"Inter\",sans-serif;"
+            f"font-size:1.55rem;font-weight:700;color:{T['text']};line-height:1.1;"
+            f"letter-spacing:-0.03em'>Kalshi PnL Dashboard</div>"
+            f"<p style='font-family:\"Inter\",sans-serif;font-size:0.88rem;font-weight:400;"
+            f"color:{T['muted']};margin-top:10px;line-height:1.65'>"
             f"Analyze realized PnL by trade, market, month, and year.</p></div>",
             unsafe_allow_html=True,
         )
 
-        st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top:32px'></div>", unsafe_allow_html=True)
 
-        col_left, col_right = st.columns([3, 2])
+        col_left, col_right = st.columns([3, 2], gap="large")
 
         with col_left:
-            # Connect card
+            # Connect card — uses .connect-card CSS class (gradient top hairline, multi-shadow)
             st.markdown(
                 f"<div class='connect-card'>"
-                f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
-                f"font-size:1.05rem;font-weight:700;color:{T['text']};margin-bottom:4px'>"
+                f"<div style='font-family:\"Inter\",sans-serif;"
+                f"font-size:1rem;font-weight:600;color:{T['text']};letter-spacing:-0.01em'>"
                 f"Connect your Kalshi account</div>"
-                f"<p style='font-family:\"JetBrains Mono\",monospace;font-size:0.72rem;"
-                f"color:{T['muted']};margin-bottom:20px;line-height:1.6'>"
-                f"Use your RSA API key from kalshi.com → Settings → API.</p>",
+                f"<p style='font-family:\"Inter\",sans-serif;font-size:0.78rem;font-weight:400;"
+                f"color:{T['muted']};margin-top:6px;margin-bottom:22px;line-height:1.65'>"
+                f"Go to kalshi.com → Settings → API to generate your key pair.</p>",
                 unsafe_allow_html=True,
             )
 
@@ -1016,7 +1162,7 @@ def main() -> None:
                 height=140,
             )
 
-            if st.button("Connect", type="primary", use_container_width=True):
+            if st.button("Connect to Kalshi", type="primary", use_container_width=True):
                 if not key_id.strip() or not pem.strip():
                     st.error("Both fields are required.")
                 elif not pem.strip().startswith("-----BEGIN"):
@@ -1025,7 +1171,7 @@ def main() -> None:
                         "or -----BEGIN PRIVATE KEY-----"
                     )
                 else:
-                    with st.spinner("Connecting to Kalshi…"):
+                    with st.spinner("Connecting…"):
                         try:
                             serialization.load_pem_private_key(pem.strip().encode(), password=None)
                             st.session_state.creds = {
@@ -1038,44 +1184,41 @@ def main() -> None:
                         except Exception as e:
                             st.error(f"Invalid private key: {e}")
 
-            # Close the connect-card div
             st.markdown("</div>", unsafe_allow_html=True)
 
         with col_right:
-            # Security card
+            # Security card — uses .info-card CSS class
             st.markdown(
-                f"<div style='background:{T['card']};border:1px solid {T['border']};"
-                f"border-radius:10px;padding:22px 24px 20px;margin-bottom:16px'>"
-                f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
-                f"font-size:0.95rem;font-weight:700;color:{T['text']};margin-bottom:14px'>"
-                f"🔒 Security</div>"
-                f"<ul style='font-family:\"JetBrains Mono\",monospace;font-size:0.75rem;"
-                f"color:{T['soft']};line-height:2;margin:0 0 14px;padding-left:18px'>"
+                f"<div class='info-card' style='margin-bottom:14px'>"
+                f"<div style='font-family:\"Inter\",sans-serif;"
+                f"font-size:0.78rem;font-weight:600;color:{T['text']};letter-spacing:-0.01em;"
+                f"margin-bottom:14px'>🔒 Security</div>"
+                f"<ul style='font-family:\"Inter\",sans-serif;font-size:0.78rem;font-weight:400;"
+                f"color:{T['soft']};line-height:2;margin:0 0 12px;padding-left:16px'>"
                 f"<li>Your private key is never stored to disk</li>"
-                f"<li>It lives in your browser session only</li>"
-                f"<li>All requests are signed locally in-memory</li>"
-                f"<li>Refreshing the page clears your credentials</li>"
+                f"<li>Lives in your browser session only</li>"
+                f"<li>All requests signed locally, in-memory</li>"
+                f"<li>Refresh the page to clear credentials</li>"
                 f"<li>Open source — <a href='https://github.com/kevinhjshim/kalshi-pnl' "
-                f"target='_blank' style='color:{T['accent']};text-decoration:none'>"
-                f"review the code on GitHub</a></li>"
+                f"target='_blank' style='color:{T['accent']};text-decoration:none;"
+                f"font-weight:500'>review the code ↗</a></li>"
                 f"</ul>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
 
-            # What you'll see card
+            # Preview card
             st.markdown(
-                f"<div style='background:{T['card']};border:1px solid {T['border']};"
-                f"border-radius:10px;padding:22px 24px 20px'>"
-                f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
-                f"font-size:0.95rem;font-weight:700;color:{T['text']};margin-bottom:14px'>"
-                f"After connecting you'll get:</div>"
-                f"<ul style='font-family:\"JetBrains Mono\",monospace;font-size:0.75rem;"
+                f"<div class='info-card'>"
+                f"<div style='font-family:\"Inter\",sans-serif;"
+                f"font-size:0.78rem;font-weight:600;color:{T['text']};letter-spacing:-0.01em;"
+                f"margin-bottom:14px'>After connecting you'll get</div>"
+                f"<ul style='font-family:\"Inter\",sans-serif;font-size:0.78rem;font-weight:400;"
                 f"color:{T['soft']};line-height:2.1;margin:0;padding-left:0;list-style:none'>"
-                f"<li><span style='color:{T['accent']}'>✦</span> Total realized PnL</li>"
-                f"<li><span style='color:{T['accent']}'>✦</span> Monthly &amp; yearly breakdowns</li>"
-                f"<li><span style='color:{T['accent']}'>✦</span> Per-trade cost, entry price, win/loss</li>"
-                f"<li><span style='color:{T['accent']}'>✦</span> Exclude trades placed for others</li>"
+                f"<li><span style='color:{T['accent']};margin-right:8px'>✦</span>Total realized PnL</li>"
+                f"<li><span style='color:{T['accent']};margin-right:8px'>✦</span>Monthly &amp; yearly breakdown</li>"
+                f"<li><span style='color:{T['accent']};margin-right:8px'>✦</span>Per-trade cost, entry price, W/L</li>"
+                f"<li><span style='color:{T['accent']};margin-right:8px'>✦</span>Exclude trades placed for others</li>"
                 f"</ul>"
                 f"</div>",
                 unsafe_allow_html=True,
@@ -1124,19 +1267,23 @@ def main() -> None:
     pnl_color  = T["profit"] if total_pnl >= 0 else T["loss"]
     pnl_sign   = "+" if total_pnl >= 0 else ""
 
+    # Large PnL number — text-shadow glow in profit/loss color for depth
     st.markdown(
-        f"<div style='padding:8px 0 2px'>"
-        f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
-        f"font-size:2.8rem;font-weight:800;color:{pnl_color};line-height:1;"
-        f"letter-spacing:-0.03em'>{pnl_sign}${total_pnl:,.2f}</div>"
-        f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.68rem;"
-        f"color:{T['muted']};letter-spacing:0.1em;margin-top:4px'>"
-        f"{selected_year.upper()} · {n:,} SETTLED MARKETS</div></div>",
+        f"<div style='padding:10px 0 4px'>"
+        f"<div style='font-family:\"Inter\",sans-serif;"
+        f"font-size:3rem;font-weight:800;color:{pnl_color};line-height:1;"
+        f"letter-spacing:-0.04em;"
+        f"text-shadow:0 0 48px {pnl_color}33'>{pnl_sign}${total_pnl:,.2f}</div>"
+        f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.62rem;"
+        f"font-weight:400;color:{T['muted']};letter-spacing:0.12em;margin-top:8px'>"
+        f"{selected_year.upper()} &nbsp;·&nbsp; {n:,} SETTLED MARKETS</div>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
+    st.markdown("<div style='margin-top:18px'></div>", unsafe_allow_html=True)
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.markdown(metric_card("Win Rate",    f"{wins/n*100:.1f}%",   f"{wins}W  /  {n-wins}L", T), unsafe_allow_html=True)
+    c1.markdown(metric_card("Win Rate",    f"{wins/n*100:.1f}%",   f"{wins}W / {n-wins}L", T), unsafe_allow_html=True)
     c2.markdown(metric_card("Avg / Trade", f"${avg_pnl:,.2f}",    "", T,
                             accent=T["profit"] if avg_pnl >= 0 else T["loss"],
                             value_color=T["profit"] if avg_pnl >= 0 else T["loss"]), unsafe_allow_html=True)
@@ -1145,24 +1292,26 @@ def main() -> None:
     c4.markdown(metric_card("Worst Trade", f"${included['pnl'].min():,.2f}", "", T,
                             accent=T["loss"], value_color=T["loss"]),   unsafe_allow_html=True)
     c5.markdown(metric_card("Total Fees",  f"${total_fees:,.2f}",  "", T,
-                            accent=T["border2"]), unsafe_allow_html=True)
+                            accent=T["muted"]), unsafe_allow_html=True)
 
     if not excluded.empty:
         excl_pnl = excluded["pnl"].sum()
         st.markdown(
             f"<div style='background:{T['card']};border:1px solid {T['border']};"
-            f"border-left:3px solid {T['warn']};border-radius:0 6px 6px 0;"
-            f"padding:9px 14px;margin-top:10px'>"
-            f"<span style='font-family:\"JetBrains Mono\",monospace;font-size:0.72rem;"
+            f"border-left:2px solid {T['warn']};border-radius:0 8px 8px 0;"
+            f"padding:10px 16px;margin-top:14px;"
+            f"box-shadow:0 1px 6px rgba(0,0,0,0.12)'>"
+            f"<span style='font-family:\"Inter\",sans-serif;font-size:0.75rem;"
             f"color:{T['muted']}'>"
-            f"{len(excluded)} markets excluded  ·  "
-            f"excl. PnL: <span style='color:{T['warn']}'>${excl_pnl:,.2f}</span>  ·  "
-            f"grand total: <span style='color:{T['text']}'>${view_df['pnl'].sum():,.2f}</span>"
+            f"{len(excluded)} markets excluded &nbsp;·&nbsp; "
+            f"excl. PnL: <span style='color:{T['warn']};font-weight:600'>${excl_pnl:,.2f}</span>"
+            f" &nbsp;·&nbsp; grand total: <span style='color:{T['text']};font-weight:600'>"
+            f"${view_df['pnl'].sum():,.2f}</span>"
             f"</span></div>",
             unsafe_allow_html=True,
         )
 
-    st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top:22px'></div>", unsafe_allow_html=True)
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
     tab_mo, tab_yr, tab_all = st.tabs(["  Monthly  ", "  Yearly  ", "  All Trades  "])
