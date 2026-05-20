@@ -142,18 +142,35 @@ def process_settlements(settlements: list, creds_key: str, creds: dict) -> pd.Da
     rows = []
     for s in settlements:
         ticker = s.get("ticker", "")
-        revenue = s.get("revenue", 0) / 100
-        cost = (s.get("yes_total_cost", 0) + s.get("no_total_cost", 0)) / 100
+        result = (s.get("market_result") or "").lower()
+
+        yes_cost = float(s.get("yes_total_cost_dollars", 0))
+        no_cost = float(s.get("no_total_cost_dollars", 0))
+        fee = float(s.get("fee_cost", 0))
+        total_cost = yes_cost + no_cost + fee
+
+        yes_count = float(s.get("yes_count_fp", 0))
+        no_count = float(s.get("no_count_fp", 0))
+
+        # Kalshi doesn't populate revenue; derive it from winning side × $1/contract
+        if result == "yes":
+            revenue = yes_count * 1.0
+        elif result == "no":
+            revenue = no_count * 1.0
+        else:
+            revenue = 0.0
+
         rows.append(
             {
                 "ticker": ticker,
                 "settled_time": s.get("settled_time", ""),
                 "revenue": revenue,
-                "cost": cost,
-                "pnl": revenue - cost,
-                "result": (s.get("market_result") or "").upper(),
-                "yes_count": s.get("yes_count", 0),
-                "no_count": s.get("no_count", 0),
+                "cost": total_cost,
+                "fee": fee,
+                "pnl": revenue - total_cost,
+                "result": result.upper(),
+                "yes_count": yes_count,
+                "no_count": no_count,
             }
         )
 
@@ -391,9 +408,6 @@ The private key is only stored in your browser session and never sent anywhere e
     if not settlements:
         st.info("No settled trades found yet — markets appear here after they resolve.")
         return
-
-    with st.expander("🔍 Raw settlement fields (debug — remove once confirmed)"):
-        st.json(settlements[0])
 
     df = process_settlements(settlements, creds_key, creds)
     if df.empty:
