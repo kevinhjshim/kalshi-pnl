@@ -108,8 +108,8 @@ p, li, span, div {{ font-family: 'Bricolage Grotesque', sans-serif; }}
 }}
 .stTextInput > div > div > input:focus,
 .stTextArea > div > div > textarea:focus {{
-    border-color: {C_BLUE} !important;
-    box-shadow: 0 0 0 2px rgba(88,166,255,0.2) !important;
+    border-color: {C_GOLD} !important;
+    box-shadow: 0 0 0 2px rgba(255,214,10,0.15) !important;
 }}
 
 /* ── Tabs ── */
@@ -297,9 +297,9 @@ def fetch_market_titles(creds_key: str, creds: dict, tickers: tuple) -> dict:
             resp = _get("/markets", creds, {"tickers": ",".join(batch), "limit": 200})
             if resp.status_code == 200:
                 for m in resp.json().get("markets", []):
-                    title = m.get("title") or m.get("subtitle") or ""
-                    if title:
-                        title_map[m["ticker"]] = clean_title(title)
+                    raw = m.get("title") or m.get("subtitle") or ""
+                    if raw:
+                        title_map[m["ticker"]] = normalize_market_title(raw, m["ticker"])
         except Exception:
             pass
 
@@ -310,13 +310,13 @@ def fetch_market_titles(creds_key: str, creds: dict, tickers: tuple) -> dict:
             resp = _get(f"/markets/{t}", creds)
             if resp.status_code == 200:
                 m = resp.json().get("market", {})
-                title = m.get("title") or m.get("subtitle") or ""
-                if title:
-                    title_map[t] = clean_title(title)
+                raw = m.get("title") or m.get("subtitle") or ""
+                if raw:
+                    title_map[t] = normalize_market_title(raw, t)
         except Exception:
             pass
 
-    # Ticker parser fallback for anything still missing
+    # Final fallback: ticker parser
     for t in tickers_list:
         if t not in title_map:
             title_map[t] = parse_ticker(t)
@@ -373,17 +373,48 @@ def parse_ticker(ticker: str) -> str:
     return ticker
 
 
-def clean_title(title: str) -> str:
-    """Normalize API-returned titles to consistent sentence case."""
-    title = title.strip()
-    if not title:
-        return title
-    # If all-caps, convert to title case
+def normalize_market_title(raw_title: str, ticker: str) -> str:
+    """Convert any Kalshi market title into one consistent, readable format."""
+    title = (raw_title or "").strip()
+    if not title or title == ticker:
+        return parse_ticker(ticker)
+
+    # ── Multi-pick: "yes Cleveland, yes OKC, yes MIN, ..." ────────────────────
+    # These come from bundle / parlay markets. Strip the "yes "/"no " prefixes
+    # and join clearly.
+    if re.match(r"^(yes|no)\s+\S", title, re.IGNORECASE):
+        parts = [p.strip() for p in title.split(",")]
+        picks = []
+        for p in parts:
+            m = re.match(r"^(yes|no)\s+(.+)$", p.strip(), re.IGNORECASE)
+            picks.append(m.group(2).strip() if m else p.strip())
+        if len(picks) <= 4:
+            return " · ".join(picks)
+        return " · ".join(picks[:3]) + f"  (+{len(picks) - 3} more)"
+
+    # ── Game matchup: "X at/vs Y [C] Winner?" ────────────────────────────────
+    m = re.match(
+        r"^(.+?)\s+(?:at|vs\.?)\s+(.+?)(?:\s+[A-Z]{1,2})?\s+Winner\??$",
+        title, re.IGNORECASE,
+    )
+    if m:
+        t1 = m.group(1).strip()
+        t2 = re.sub(r"\s+[A-Z]{1,2}$", "", m.group(2).strip()).strip()
+        return f"{t1} vs {t2}"
+
+    # ── Standalone "X Winner" / "X Winner?" ──────────────────────────────────
+    title = re.sub(r"\s+Winner\??$", "", title, flags=re.IGNORECASE).strip()
+
+    # ── All-caps → title case ─────────────────────────────────────────────────
     if title == title.upper() and len(title) > 4:
         title = title.title()
-    # Trim trailing punctuation oddities
-    title = title.rstrip(" -_")
-    return title
+
+    return re.sub(r"\s+", " ", title).strip()
+
+
+# Keep as thin alias so fetch_market_titles can call it
+def clean_title(title: str) -> str:
+    return title.strip().rstrip(" -_")
 
 
 # ── Data processing ───────────────────────────────────────────────────────────
@@ -391,32 +422,46 @@ def clean_title(title: str) -> str:
 def process_settlements(settlements: list, creds_key: str, creds: dict) -> pd.DataFrame:
     rows = []
     for s in settlements:
-        ticker  = s.get("ticker", "")
-        result  = (s.get("market_result") or "").lower()
-        yes_cost = float(s.get("yes_total_cost_dollars", 0))
-        no_cost  = float(s.get("no_total_cost_dollars",  0))
-        fee      = float(s.get("fee_cost", 0))
+        ticker    = s.get("ticker", "")
+        result    = (s.get("market_result") or "").lower()
+        yes_cost  = float(s.get("yes_total_cost_dollars", 0))
+        no_cost   = float(s.get("no_total_cost_dollars",  0))
+        fee       = float(s.get("fee_cost", 0))
         total_cost = yes_cost + no_cost + fee
         yes_count = float(s.get("yes_count_fp", 0))
         no_count  = float(s.get("no_count_fp",  0))
 
-        if result == "yes":
-            revenue = yes_count
-        elif result == "no":
-            revenue = no_count
+        revenue = yes_count if result == "yes" else (no_count if result == "no" else 0.0)
+
+        # Determine primary held position (use cost as tiebreaker)
+        if yes_cost > 0 and no_cost == 0:
+            held, contracts = "YES", yes_count
+            entry_cents = (yes_cost / yes_count * 100) if yes_count > 0 else 0.0
+        elif no_cost > 0 and yes_cost == 0:
+            held, contracts = "NO", no_count
+            entry_cents = (no_cost / no_count * 100) if no_count > 0 else 0.0
+        elif yes_cost >= no_cost:
+            held, contracts = "YES", yes_count
+            entry_cents = (yes_cost / yes_count * 100) if yes_count > 0 else 0.0
         else:
-            revenue = 0.0
+            held, contracts = "NO", no_count
+            entry_cents = (no_cost / no_count * 100) if no_count > 0 else 0.0
 
         rows.append({
-            "ticker":      ticker,
+            "ticker":       ticker,
             "settled_time": s.get("settled_time", ""),
-            "revenue":     revenue,
-            "cost":        total_cost,
-            "fee":         fee,
-            "pnl":         revenue - total_cost,
-            "result":      result.upper(),
-            "yes_count":   yes_count,
-            "no_count":    no_count,
+            "revenue":      revenue,
+            "yes_cost":     yes_cost,
+            "no_cost":      no_cost,
+            "fee":          fee,
+            "cost":         total_cost,
+            "pnl":          revenue - total_cost,
+            "result":       result.upper(),
+            "yes_count":    yes_count,
+            "no_count":     no_count,
+            "held":         held,
+            "contracts":    contracts,
+            "entry_cents":  entry_cents,
         })
 
     df = pd.DataFrame(rows)
@@ -558,16 +603,45 @@ def metric_card(label: str, value: str, sub: str = "",
 
 
 def format_trade_table(df: pd.DataFrame) -> pd.DataFrame:
-    out = df[["settled_time", "ticker", "title", "result",
-              "yes_count", "no_count", "fee", "cost", "revenue", "pnl"]].copy()
-    out["settled_time"] = out["settled_time"].dt.strftime("%Y-%m-%d")
-    for col in ("fee", "cost", "revenue", "pnl"):
-        out[col] = out[col].map("${:,.2f}".format)
-    return out.rename(columns={
-        "settled_time": "Date", "ticker": "Ticker", "title": "Market",
-        "result": "Result", "yes_count": "YES", "no_count": "NO",
-        "fee": "Fees", "cost": "Cost", "revenue": "Revenue", "pnl": "PnL",
-    })
+    out = df.copy()
+
+    # Date — readable, no leading zeros
+    out["Date"] = out["settled_time"].apply(
+        lambda dt: f"{dt.strftime('%b')} {dt.day}, {dt.year}"
+    )
+
+    # Held — what the user bought
+    out["Held"] = out["held"]
+
+    # Outcome — what the market resolved to
+    out["Outcome"] = out["result"]   # "YES" or "NO"
+
+    # Win / Loss
+    out["W/L"] = out["pnl"].apply(lambda x: "WIN" if x > 0 else ("LOSS" if x < 0 else "PUSH"))
+
+    # Contracts — round to int when clean, keep 2dp otherwise
+    def fmt_contracts(v: float) -> str:
+        return str(int(v)) if v == int(v) else f"{v:.1f}"
+
+    out["Contracts"] = out["contracts"].apply(fmt_contracts)
+
+    # Entry price in cents (0–100¢)
+    out["Entry"] = out["entry_cents"].apply(
+        lambda x: f"¢{x:.1f}" if x > 0 else "—"
+    )
+
+    # Cost = what they spent (YES + NO costs + fee)
+    out["Cost"] = out["cost"].map("${:,.2f}".format)
+
+    # PnL with explicit +/- sign
+    out["PnL"] = out["pnl"].apply(
+        lambda x: f"+${x:,.2f}" if x > 0 else f"-${abs(x):,.2f}"
+    )
+
+    return out[["Date", "title", "Held", "Outcome", "W/L",
+                "Contracts", "Entry", "Cost", "PnL"]].rename(
+        columns={"title": "Market"}
+    )
 
 
 # ── Summary table helpers ─────────────────────────────────────────────────────
