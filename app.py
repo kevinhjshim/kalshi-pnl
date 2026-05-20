@@ -19,27 +19,32 @@ KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2"
 KALSHI_API_PATH_PREFIX = "/trade-api/v2"
 EXCLUSIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exclusions.json")
 
-# ── Kalshi-inspired palette ───────────────────────────────────────────────────
-C_BG        = "#0B0E13"
-C_SURFACE   = "#111418"
-C_CARD      = "#161B22"
-C_BORDER    = "#21262D"
-C_BORDER2   = "#30363D"
-C_TEXT      = "#F0F6FC"
-C_MUTED     = "#8B949E"
-C_GREEN     = "#3FB950"
-C_RED       = "#F85149"
-C_BLUE      = "#58A6FF"
-C_YELLOW    = "#D29922"
+# ── Night Market palette ──────────────────────────────────────────────────────
+C_BG      = "#060606"
+C_SURFACE = "#0E0E0E"
+C_CARD    = "#161616"
+C_BORDER  = "#282828"
+C_BORDER2 = "#363636"
+C_TEXT    = "#F2F2F2"
+C_MUTED   = "#5E5E5E"
+C_SOFT    = "#999999"
+C_GOLD    = "#FFD60A"   # primary accent — vivid gold
+C_PROFIT  = "#00D68F"   # electric mint green
+C_LOSS    = "#FF4D4F"   # vivid red
+C_LINE    = "#7B61FF"   # cumulative line — violet
 
 THEME_CSS = f"""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
 /* ── Base ── */
-html, .stApp, [data-testid="stAppViewContainer"] {{
+html, body, .stApp, [data-testid="stAppViewContainer"] {{
     background-color: {C_BG} !important;
     color: {C_TEXT};
+    font-family: 'Bricolage Grotesque', sans-serif;
 }}
-[data-testid="stHeader"] {{ background-color: {C_BG} !important; }}
+[data-testid="stHeader"] {{ background-color: {C_BG} !important; border-bottom: 1px solid {C_BORDER}; }}
+p, li, span, div {{ font-family: 'Bricolage Grotesque', sans-serif; }}
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {{
@@ -50,62 +55,56 @@ html, .stApp, [data-testid="stAppViewContainer"] {{
 [data-testid="collapsedControl"] {{
     background-color: {C_SURFACE} !important;
     border-right: 1px solid {C_BORDER};
-    color: {C_MUTED} !important;
 }}
-
-/* ── Metrics ── */
-[data-testid="stMetric"] {{
-    background-color: {C_CARD};
-    border: 1px solid {C_BORDER};
-    border-radius: 10px;
-    padding: 16px 20px !important;
-}}
-[data-testid="stMetricLabel"] > div {{
-    color: {C_MUTED} !important;
-    font-size: 0.7rem !important;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-weight: 500;
-}}
-[data-testid="stMetricValue"] {{
-    color: {C_TEXT} !important;
-    font-size: 1.45rem !important;
-    font-weight: 600;
-}}
-[data-testid="stMetricDelta"] {{ font-size: 0.75rem !important; }}
 
 /* ── Buttons ── */
 .stButton > button {{
-    background-color: {C_CARD};
-    color: {C_TEXT};
+    background-color: transparent;
+    color: {C_SOFT};
     border: 1px solid {C_BORDER2};
-    border-radius: 6px;
-    font-size: 0.85rem;
-    transition: all 0.15s;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    transition: all 0.12s ease;
 }}
 .stButton > button:hover {{
-    background-color: {C_BORDER2};
-    border-color: {C_MUTED};
+    border-color: {C_GOLD};
+    color: {C_GOLD};
+    background-color: rgba(255,214,10,0.06);
 }}
 .stButton > button[kind="primary"] {{
-    background-color: {C_BLUE};
-    border-color: {C_BLUE};
-    color: #fff;
-    font-weight: 600;
+    background-color: {C_GOLD};
+    border-color: {C_GOLD};
+    color: {C_BG};
+    font-weight: 700;
 }}
 .stButton > button[kind="primary"]:hover {{
-    background-color: #79b8ff;
-    border-color: #79b8ff;
+    background-color: #FFE040;
+    border-color: #FFE040;
 }}
 
 /* ── Inputs ── */
 .stTextInput > div > div > input,
-.stTextArea > div > div > textarea,
-.stSelectbox > div > div > div {{
+.stTextArea > div > div > textarea {{
     background-color: {C_CARD} !important;
     border: 1px solid {C_BORDER2} !important;
     color: {C_TEXT} !important;
-    border-radius: 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.82rem !important;
+}}
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus {{
+    border-color: {C_GOLD} !important;
+    box-shadow: 0 0 0 2px rgba(255,214,10,0.15) !important;
+}}
+.stSelectbox > div > div {{
+    background-color: {C_CARD} !important;
+    border: 1px solid {C_BORDER2} !important;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.82rem !important;
 }}
 .stTextInput > div > div > input:focus,
 .stTextArea > div > div > textarea:focus {{
@@ -123,67 +122,70 @@ html, .stApp, [data-testid="stAppViewContainer"] {{
     background: transparent;
     color: {C_MUTED};
     border-bottom: 2px solid transparent;
-    padding: 8px 16px;
-    font-size: 0.875rem;
-    font-weight: 500;
+    padding: 10px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }}
 .stTabs [aria-selected="true"] {{
     background: transparent !important;
-    color: {C_TEXT} !important;
-    border-bottom-color: {C_BLUE} !important;
+    color: {C_GOLD} !important;
+    border-bottom-color: {C_GOLD} !important;
 }}
-.stTabs [data-baseweb="tab-panel"] {{
-    padding-top: 20px;
-}}
+.stTabs [data-baseweb="tab-panel"] {{ padding-top: 24px; }}
 
 /* ── Expanders ── */
 [data-testid="stExpander"] {{
     background-color: {C_CARD};
     border: 1px solid {C_BORDER};
-    border-radius: 8px;
+    border-radius: 4px;
 }}
-[data-testid="stExpander"] summary {{
-    color: {C_TEXT};
-}}
+[data-testid="stExpander"] summary {{ color: {C_SOFT}; font-size: 0.82rem; }}
 
 /* ── Divider ── */
-hr {{ border-color: {C_BORDER} !important; margin: 12px 0; }}
+hr {{ border-color: {C_BORDER} !important; margin: 16px 0; }}
 
 /* ── Code / tags ── */
 code {{
     background-color: {C_CARD} !important;
-    color: {C_BLUE} !important;
-    border: 1px solid {C_BORDER} !important;
-    border-radius: 4px;
-    padding: 1px 6px;
-    font-size: 0.8rem;
+    color: {C_GOLD} !important;
+    border: 1px solid {C_BORDER2} !important;
+    border-radius: 3px;
+    padding: 2px 7px;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.78rem;
 }}
 
-/* ── Alerts / info ── */
+/* ── Alerts ── */
 [data-testid="stAlert"] {{
     background-color: {C_CARD} !important;
-    border: 1px solid {C_BORDER} !important;
-    border-radius: 8px;
-    color: {C_TEXT} !important;
+    border: 1px solid {C_BORDER2} !important;
+    border-radius: 4px;
+    color: {C_SOFT} !important;
+    font-size: 0.85rem;
 }}
 
 /* ── Dataframe ── */
 [data-testid="stDataFrame"] {{
     border: 1px solid {C_BORDER};
-    border-radius: 8px;
+    border-radius: 4px;
     overflow: hidden;
 }}
 
-/* ── Caption / small text ── */
-[data-testid="stCaptionContainer"] {{ color: {C_MUTED}; font-size: 0.8rem; }}
-
 /* ── Radio ── */
-.stRadio [data-testid="stMarkdownContainer"] p {{ color: {C_TEXT}; font-size: 0.85rem; }}
+.stRadio label {{ font-size: 0.82rem !important; color: {C_SOFT} !important; }}
+.stRadio [data-testid="stMarkdownContainer"] p {{ color: {C_SOFT}; font-size: 0.82rem; }}
+
+/* ── Select ── */
+[data-testid="stSelectbox"] label {{ color: {C_MUTED} !important; font-size: 0.72rem; }}
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar {{ width: 6px; height: 6px; }}
+::-webkit-scrollbar {{ width: 4px; height: 4px; }}
 ::-webkit-scrollbar-track {{ background: {C_BG}; }}
-::-webkit-scrollbar-thumb {{ background: {C_BORDER2}; border-radius: 3px; }}
+::-webkit-scrollbar-thumb {{ background: {C_BORDER2}; border-radius: 2px; }}
+::-webkit-scrollbar-thumb:hover {{ background: {C_MUTED}; }}
 </style>
 """
 
@@ -461,62 +463,98 @@ def keyword_match_count(df: pd.DataFrame, kw: str) -> int:
 # ── Charts ────────────────────────────────────────────────────────────────────
 
 def _plotly_layout(title: str) -> dict:
+    mono = "JetBrains Mono, monospace"
     return dict(
-        title=dict(text=title, font=dict(color=C_TEXT, size=15)),
-        height=420,
+        title=dict(
+            text=title.upper(),
+            font=dict(family=mono, color=C_MUTED, size=10),
+            x=0, xanchor="left",
+        ),
+        height=400,
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color=C_MUTED),
+        font=dict(family=mono, color=C_MUTED, size=11),
         yaxis=dict(
-            title="PnL ($)",
-            zeroline=True,
-            zerolinecolor=C_BORDER2,
-            gridcolor=C_BORDER,
-            tickfont=dict(color=C_MUTED),
+            title="",
+            zeroline=True, zerolinecolor=C_BORDER2, zerolinewidth=1,
+            gridcolor=C_BORDER, gridwidth=1,
+            tickfont=dict(family=mono, color=C_MUTED, size=10),
+            tickprefix="$",
         ),
         yaxis2=dict(
-            title="Cumulative ($)",
-            overlaying="y",
-            side="right",
+            title="",
+            overlaying="y", side="right",
             gridcolor="rgba(0,0,0,0)",
-            tickfont=dict(color=C_BLUE),
+            tickfont=dict(family=mono, color=C_LINE, size=10),
+            tickprefix="$",
         ),
-        xaxis=dict(showgrid=False, tickfont=dict(color=C_MUTED)),
+        xaxis=dict(
+            showgrid=False,
+            tickfont=dict(family=mono, color=C_MUTED, size=10),
+        ),
         hovermode="x unified",
-        hoverlabel=dict(bgcolor=C_CARD, bordercolor=C_BORDER, font=dict(color=C_TEXT)),
+        hoverlabel=dict(
+            bgcolor=C_CARD, bordercolor=C_BORDER2,
+            font=dict(family=mono, color=C_TEXT, size=11),
+        ),
         legend=dict(
             orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-            font=dict(color=C_MUTED), bgcolor="rgba(0,0,0,0)",
+            font=dict(family=mono, color=C_MUTED, size=10),
+            bgcolor="rgba(0,0,0,0)",
         ),
-        margin=dict(t=55, b=40, l=10, r=10),
+        margin=dict(t=36, b=32, l=4, r=4),
+        bargap=0.35,
     )
 
 
 def pnl_bar_chart(grouped: pd.DataFrame, x_col: str, title: str) -> go.Figure:
     grouped = grouped.copy()
     grouped["cumulative"] = grouped["pnl"].cumsum()
-    colors = [C_GREEN if v >= 0 else C_RED for v in grouped["pnl"]]
 
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=grouped[x_col], y=grouped["pnl"],
-        marker_color=colors, marker_line_width=0,
-        name="PnL",
-        text=grouped["pnl"].apply(lambda v: f"${v:,.2f}"),
-        textposition="outside",
-        textfont=dict(color=C_MUTED, size=11),
-        hovertemplate="<b>%{x}</b><br>PnL: $%{y:,.2f}<extra></extra>",
-    ))
+    # Bars with per-bar color
+    for _, row in grouped.iterrows():
+        color = C_PROFIT if row["pnl"] >= 0 else C_LOSS
+        fig.add_trace(go.Bar(
+            x=[row[x_col]], y=[row["pnl"]],
+            marker_color=color,
+            marker_line_width=0,
+            marker_opacity=0.85,
+            showlegend=False,
+            hovertemplate=f"<b>{row[x_col]}</b><br>PnL: ${row['pnl']:,.2f}<extra></extra>",
+        ))
+
+    # Cumulative line
     fig.add_trace(go.Scatter(
         x=grouped[x_col], y=grouped["cumulative"],
-        mode="lines+markers", name="Cumulative",
-        line=dict(color=C_BLUE, width=2, dash="dot"),
-        marker=dict(size=5, color=C_BLUE),
+        mode="lines", name="cumulative",
+        line=dict(color=C_LINE, width=1.5),
         yaxis="y2",
-        hovertemplate="<b>%{x}</b><br>Cumulative: $%{y:,.2f}<extra></extra>",
+        hovertemplate="<b>%{x}</b><br>Running: $%{y:,.2f}<extra></extra>",
     ))
-    fig.update_layout(**_plotly_layout(title))
+
+    # Zero line annotation-style fill for emphasis
+    fig.add_hline(y=0, line_color=C_BORDER2, line_width=1, layer="below")
+
+    layout = _plotly_layout(title)
+    layout["showlegend"] = False
+    fig.update_layout(**layout)
     return fig
+
+
+def metric_card(label: str, value: str, sub: str = "",
+                accent: str = C_GOLD, value_color: str = C_TEXT) -> str:
+    sub_html = (f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.7rem;'
+                f'color:{C_MUTED};margin-top:5px">{sub}</div>') if sub else ""
+    return (
+        f'<div style="background:{C_CARD};border:1px solid {C_BORDER};'
+        f'border-top:2px solid {accent};border-radius:4px;padding:18px 20px 16px">'
+        f'<div style="font-family:\'Bricolage Grotesque\',sans-serif;font-size:1.9rem;'
+        f'font-weight:700;color:{value_color};line-height:1;letter-spacing:-0.02em">{value}</div>'
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.62rem;'
+        f'color:{C_MUTED};text-transform:uppercase;letter-spacing:0.12em;margin-top:8px">{label}</div>'
+        f'{sub_html}</div>'
+    )
 
 
 def format_trade_table(df: pd.DataFrame) -> pd.DataFrame:
@@ -590,17 +628,21 @@ def main() -> None:
     # ── Sidebar ───────────────────────────────────────────────────────────────
     with st.sidebar:
         st.markdown(
-            f"<h2 style='color:{C_TEXT};font-size:1.2rem;font-weight:700;"
-            f"letter-spacing:0.02em;margin-bottom:4px'>📈 Kalshi PnL</h2>"
-            f"<p style='color:{C_MUTED};font-size:0.72rem;margin-top:0'>Profit & Loss Dashboard</p>",
+            f"<div style='padding:4px 0 12px'>"
+            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;font-size:1.15rem;"
+            f"font-weight:800;color:{C_TEXT};letter-spacing:-0.01em'>KALSHI PNL</div>"
+            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.62rem;"
+            f"color:{C_MUTED};letter-spacing:0.14em;margin-top:2px'>PREDICTION MARKET TRACKER</div>"
+            f"</div>",
             unsafe_allow_html=True,
         )
         st.divider()
 
         # ── Auth ──
         if not st.session_state.creds:
-            st.markdown(f"<p style='color:{C_MUTED};font-size:0.75rem;font-weight:600;"
-                        f"text-transform:uppercase;letter-spacing:0.08em'>Login</p>",
+            st.markdown(f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
+                        f"font-size:0.62rem;font-weight:400;text-transform:uppercase;"
+                        f"letter-spacing:0.14em;margin-bottom:8px'>LOGIN</p>",
                         unsafe_allow_html=True)
             auth_mode = st.radio("", ["API Key (RSA)", "Email / Password"],
                                  label_visibility="collapsed")
@@ -642,8 +684,10 @@ def main() -> None:
         else:
             st.markdown(
                 f"<div style='background:{C_CARD};border:1px solid {C_BORDER};"
-                f"border-radius:8px;padding:10px 14px;margin-bottom:8px'>"
-                f"<span style='color:{C_GREEN};font-size:0.8rem'>● Connected</span></div>",
+                f"border-top:1px solid {C_PROFIT};border-radius:4px;"
+                f"padding:8px 14px;margin-bottom:10px'>"
+                f"<span style='font-family:\"JetBrains Mono\",monospace;color:{C_PROFIT};"
+                f"font-size:0.72rem;letter-spacing:0.08em'>● CONNECTED</span></div>",
                 unsafe_allow_html=True,
             )
             if st.button("Logout", use_container_width=True):
@@ -656,10 +700,11 @@ def main() -> None:
 
         # ── Exclusions ──
         st.markdown(
-            f"<p style='color:{C_MUTED};font-size:0.75rem;font-weight:600;"
-            f"text-transform:uppercase;letter-spacing:0.08em'>Exclusions</p>"
-            f"<p style='color:{C_MUTED};font-size:0.75rem;line-height:1.4;margin-bottom:8px'>"
-            f"Exclude trades from PnL — useful for trades placed on behalf of someone else.</p>",
+            f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
+            f"font-size:0.62rem;text-transform:uppercase;letter-spacing:0.14em;"
+            f"margin-bottom:4px'>Exclusions</p>"
+            f"<p style='color:{C_MUTED};font-size:0.78rem;line-height:1.5;margin-bottom:10px'>"
+            f"Filter trades out of your PnL — e.g. trades made for a friend.</p>",
             unsafe_allow_html=True,
         )
 
@@ -682,12 +727,16 @@ def main() -> None:
         for i, kw in enumerate(keywords[:]):
             count = keyword_match_count(full_df, kw) if not full_df.empty else 0
             c1, c2 = st.columns([5, 1])
-            label = f"`{kw}`" + (f" _{count} trades_" if count else "")
             c1.markdown(
                 f"<div style='background:{C_CARD};border:1px solid {C_BORDER};"
-                f"border-radius:6px;padding:5px 10px;font-size:0.8rem;color:{C_TEXT}'>"
-                f"<span style='color:{C_BLUE}'>{kw}</span>"
-                f"<span style='color:{C_MUTED};float:right'>{count} trades</span></div>",
+                f"border-left:2px solid {C_GOLD};border-radius:0 4px 4px 0;"
+                f"padding:6px 10px;margin-bottom:2px'>"
+                f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.78rem;"
+                f"color:{C_TEXT}'>{kw}</div>"
+                f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.62rem;"
+                f"color:{C_MUTED if count == 0 else C_LOSS}'>"
+                f"{'no matches' if count == 0 else f'{count} trades excluded'}</div>"
+                f"</div>",
                 unsafe_allow_html=True,
             )
             if c2.button("×", key=f"rm_{i}", help="Remove"):
@@ -697,56 +746,68 @@ def main() -> None:
                 st.rerun()
 
         if not keywords:
-            st.markdown(f"<p style='color:{C_MUTED};font-size:0.78rem;font-style:italic'>"
-                        f"No exclusions set.</p>", unsafe_allow_html=True)
+            st.markdown(
+                f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
+                f"font-size:0.72rem;font-style:italic'>none set</p>",
+                unsafe_allow_html=True,
+            )
 
         st.divider()
 
         # ── Filters ──
-        st.markdown(f"<p style='color:{C_MUTED};font-size:0.75rem;font-weight:600;"
-                    f"text-transform:uppercase;letter-spacing:0.08em'>Filters</p>",
-                    unsafe_allow_html=True)
+        st.markdown(
+            f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
+            f"font-size:0.62rem;text-transform:uppercase;letter-spacing:0.14em;"
+            f"margin-bottom:8px'>Filters</p>",
+            unsafe_allow_html=True,
+        )
         all_years: list = st.session_state.get("all_years", [])
         year_opts = ["All years"] + [str(y) for y in sorted(all_years, reverse=True)]
         selected_year = st.selectbox("Year", year_opts, label_visibility="collapsed")
 
         st.divider()
-        if st.button("↺  Refresh data", use_container_width=True):
+        if st.button("↺  Refresh", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
-
         st.markdown(
-            f"<p style='color:{C_MUTED};font-size:0.68rem;margin-top:8px;text-align:center'>"
-            f"Use the ‹ arrow to collapse this panel</p>",
+            f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
+            f"font-size:0.6rem;letter-spacing:0.06em;margin-top:6px;text-align:center'>"
+            f"← collapse sidebar</p>",
             unsafe_allow_html=True,
         )
 
     # ── Main content ──────────────────────────────────────────────────────────
     if not st.session_state.creds:
         st.markdown(
-            f"<h1 style='color:{C_TEXT};font-size:2rem;font-weight:700'>📈 Kalshi PnL</h1>"
-            f"<p style='color:{C_MUTED};font-size:1rem'>Track your prediction market profits & losses.</p>",
+            f"<div style='padding:40px 0 20px'>"
+            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;font-size:3.2rem;"
+            f"font-weight:800;color:{C_TEXT};line-height:1;letter-spacing:-0.03em'>"
+            f"Track your<br><span style='color:{C_GOLD}'>edge.</span></div>"
+            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.82rem;"
+            f"color:{C_MUTED};margin-top:16px;line-height:1.6'>"
+            f"Kalshi PnL — per trade, per month, per year.</div>"
+            f"</div>",
             unsafe_allow_html=True,
         )
         st.divider()
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(
-                f"<div style='background:{C_CARD};border:1px solid {C_BORDER};border-radius:10px;"
-                f"padding:24px'>"
-                f"<h3 style='color:{C_TEXT};font-size:1rem;margin-top:0'>Getting Started</h3>"
-                f"<ol style='color:{C_MUTED};font-size:0.875rem;line-height:1.8'>"
-                f"<li>Log in at <b style='color:{C_TEXT}'>kalshi.com</b></li>"
-                f"<li>Go to <b style='color:{C_TEXT}'>Account → Settings → API</b></li>"
-                f"<li>Click <b style='color:{C_TEXT}'>Create API Key</b></li>"
-                f"<li>Paste your <b style='color:{C_TEXT}'>Key ID</b> and <b style='color:{C_TEXT}'>"
-                f"Private Key</b> in the sidebar</li>"
-                f"</ol>"
-                f"<p style='color:{C_MUTED};font-size:0.75rem;margin-bottom:0'>"
-                f"Your private key is only used to sign API requests and is never stored to disk.</p>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            f"<div style='background:{C_CARD};border:1px solid {C_BORDER};"
+            f"border-left:2px solid {C_GOLD};border-radius:0 4px 4px 0;padding:24px 28px;max-width:420px'>"
+            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.65rem;"
+            f"color:{C_MUTED};text-transform:uppercase;letter-spacing:0.14em;"
+            f"margin-bottom:14px'>Getting started</div>"
+            f"<ol style='color:{C_SOFT};font-size:0.85rem;line-height:2;margin:0;padding-left:18px'>"
+            f"<li>Log in at <span style='color:{C_TEXT}'>kalshi.com</span></li>"
+            f"<li>Go to <span style='color:{C_TEXT}'>Account → Settings → API</span></li>"
+            f"<li>Click <span style='color:{C_GOLD}'>Create API Key</span></li>"
+            f"<li>Paste your Key ID + Private Key in the sidebar</li>"
+            f"</ol>"
+            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.68rem;"
+            f"color:{C_MUTED};margin-top:16px;border-top:1px solid {C_BORDER};"
+            f"padding-top:12px'>Your private key never touches disk — used only to sign requests.</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
         return
 
     creds = st.session_state.creds
@@ -785,41 +846,50 @@ def main() -> None:
         st.warning("All trades in this period are excluded. Adjust your exclusion filters.")
         return
 
-    # ── Header row ────────────────────────────────────────────────────────────
-    st.markdown(
-        f"<h1 style='color:{C_TEXT};font-size:1.6rem;font-weight:700;"
-        f"margin-bottom:2px'>Profit & Loss</h1>"
-        f"<p style='color:{C_MUTED};font-size:0.85rem;margin-top:0'>"
-        f"{selected_year} · {len(included):,} settled markets</p>",
-        unsafe_allow_html=True,
-    )
-
-    # ── Metrics ───────────────────────────────────────────────────────────────
+    # ── Header ────────────────────────────────────────────────────────────────
     total_pnl = included["pnl"].sum()
     n = len(included)
     wins = int((included["pnl"] > 0).sum())
     total_fees = included["fee"].sum()
+    pnl_color = C_PROFIT if total_pnl >= 0 else C_LOSS
+    pnl_sign  = "+" if total_pnl >= 0 else ""
 
+    st.markdown(
+        f"<div style='display:flex;align-items:baseline;gap:16px;padding:8px 0 4px'>"
+        f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;font-size:3rem;"
+        f"font-weight:800;color:{pnl_color};line-height:1;letter-spacing:-0.03em'>"
+        f"{pnl_sign}${total_pnl:,.2f}</div>"
+        f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.7rem;"
+        f"color:{C_MUTED};letter-spacing:0.1em'>{selected_year.upper()} · {n:,} MARKETS</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Metrics ───────────────────────────────────────────────────────────────
     c1, c2, c3, c4, c5 = st.columns(5)
-    pnl_color = C_GREEN if total_pnl >= 0 else C_RED
-    c1.metric("Total PnL",    f"${total_pnl:,.2f}")
-    c2.metric("Markets",      f"{n:,}")
-    c3.metric("Win Rate",     f"{wins/n*100:.1f}%",  f"{wins}W / {n-wins}L")
-    c4.metric("Avg / Trade",  f"${included['pnl'].mean():,.2f}")
-    c5.metric("Total Fees",   f"${total_fees:,.2f}")
+    avg = included["pnl"].mean()
+    c1.markdown(metric_card("Win Rate",    f"{wins/n*100:.1f}%",   f"{wins}W  {n-wins}L"), unsafe_allow_html=True)
+    c2.markdown(metric_card("Avg / Trade", f"${avg:,.2f}",         accent=C_PROFIT if avg >= 0 else C_LOSS, value_color=C_PROFIT if avg >= 0 else C_LOSS), unsafe_allow_html=True)
+    c3.markdown(metric_card("Best Trade",  f"${included['pnl'].max():,.2f}", accent=C_PROFIT, value_color=C_PROFIT), unsafe_allow_html=True)
+    c4.markdown(metric_card("Worst Trade", f"${included['pnl'].min():,.2f}", accent=C_LOSS,   value_color=C_LOSS),   unsafe_allow_html=True)
+    c5.markdown(metric_card("Total Fees",  f"${total_fees:,.2f}",  accent=C_BORDER2),  unsafe_allow_html=True)
 
     if not excluded.empty:
+        excl_pnl = excluded["pnl"].sum()
         st.markdown(
-            f"<div style='background:{C_CARD};border:1px solid {C_BORDER};border-radius:8px;"
-            f"padding:10px 16px;margin-top:8px;font-size:0.82rem;color:{C_MUTED}'>"
-            f"📌 <b style='color:{C_TEXT}'>{len(excluded)} markets excluded</b> · "
-            f"Excluded PnL: <b style='color:{C_YELLOW}'>${excluded['pnl'].sum():,.2f}</b> · "
-            f"Grand total (inc. excluded): <b style='color:{C_TEXT}'>${view_df['pnl'].sum():,.2f}</b>"
-            f"</div>",
+            f"<div style='background:{C_CARD};border:1px solid {C_BORDER};"
+            f"border-left:2px solid {C_GOLD};border-radius:0 4px 4px 0;"
+            f"padding:9px 14px;margin-top:10px'>"
+            f"<span style='font-family:\"JetBrains Mono\",monospace;font-size:0.72rem;"
+            f"color:{C_MUTED}'>"
+            f"{len(excluded)} markets excluded  ·  "
+            f"excl. PnL <span style='color:{C_GOLD}'>${excl_pnl:,.2f}</span>  ·  "
+            f"grand total <span style='color:{C_TEXT}'>${view_df['pnl'].sum():,.2f}</span>"
+            f"</span></div>",
             unsafe_allow_html=True,
         )
 
-    st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
     tab_mo, tab_yr, tab_all = st.tabs(["  Monthly  ", "  Yearly  ", "  All Trades  "])
