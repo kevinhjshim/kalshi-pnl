@@ -15,195 +15,240 @@ import streamlit as st
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding as crypto_padding
 
-KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2"
+KALSHI_API_BASE       = "https://api.elections.kalshi.com/trade-api/v2"
 KALSHI_API_PATH_PREFIX = "/trade-api/v2"
-EXCLUSIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exclusions.json")
+SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
 
-# ── Night Market palette ──────────────────────────────────────────────────────
-C_BG      = "#060606"
-C_SURFACE = "#0E0E0E"
-C_CARD    = "#161616"
-C_BORDER  = "#282828"
-C_BORDER2 = "#363636"
-C_TEXT    = "#F2F2F2"
-C_MUTED   = "#5E5E5E"
-C_SOFT    = "#999999"
-C_GOLD    = "#FFD60A"   # primary accent — vivid gold
-C_PROFIT  = "#00D68F"   # electric mint green
-C_LOSS    = "#FF4D4F"   # vivid red
-C_LINE    = "#7B61FF"   # cumulative line — violet
+# ── Theme definitions ─────────────────────────────────────────────────────────
+THEMES: dict[str, dict] = {
+    "Dark": {
+        "bg":      "#111827",   # slate-900 — easier on eyes than pure black
+        "surface": "#1F2937",
+        "card":    "#1F2937",
+        "border":  "#374151",
+        "border2": "#4B5563",
+        "text":    "#F9FAFB",
+        "muted":   "#9CA3AF",
+        "soft":    "#D1D5DB",
+        "accent":  "#818CF8",   # indigo-400
+        "profit":  "#34D399",   # emerald-400
+        "loss":    "#F87171",   # red-400
+        "line":    "#67E8F9",   # cyan-300
+        "warn":    "#FCD34D",   # amber-300
+    },
+    "Light": {
+        "bg":      "#F9FAFB",
+        "surface": "#F3F4F6",
+        "card":    "#FFFFFF",
+        "border":  "#E5E7EB",
+        "border2": "#D1D5DB",
+        "text":    "#111827",
+        "muted":   "#6B7280",
+        "soft":    "#374151",
+        "accent":  "#6366F1",   # indigo-500
+        "profit":  "#059669",   # emerald-600
+        "loss":    "#DC2626",   # red-600
+        "line":    "#0284C7",   # sky-600
+        "warn":    "#D97706",   # amber-600
+    },
+}
 
-THEME_CSS = f"""
+
+def build_css(T: dict) -> str:
+    return f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+/* ── Selection ── */
+::selection {{ background: {T['accent']}44; color: {T['text']}; }}
 
 /* ── Base ── */
 html, body, .stApp, [data-testid="stAppViewContainer"] {{
-    background-color: {C_BG} !important;
-    color: {C_TEXT};
+    background-color: {T['bg']} !important;
+    color: {T['text']};
     font-family: 'Bricolage Grotesque', sans-serif;
 }}
-[data-testid="stHeader"] {{ background-color: {C_BG} !important; border-bottom: 1px solid {C_BORDER}; }}
+[data-testid="stHeader"] {{
+    background-color: {T['bg']} !important;
+    border-bottom: 1px solid {T['border']};
+}}
 p, li, span, div {{ font-family: 'Bricolage Grotesque', sans-serif; }}
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {{
-    background-color: {C_SURFACE} !important;
-    border-right: 1px solid {C_BORDER};
+    background-color: {T['surface']} !important;
+    border-right: 1px solid {T['border']};
 }}
-[data-testid="stSidebar"] * {{ color: {C_TEXT}; }}
+[data-testid="stSidebar"] * {{ color: {T['text']}; }}
 [data-testid="collapsedControl"] {{
-    background-color: {C_SURFACE} !important;
-    border-right: 1px solid {C_BORDER};
+    background-color: {T['surface']} !important;
+    border-right: 1px solid {T['border']};
 }}
 
 /* ── Buttons ── */
 .stButton > button {{
     background-color: transparent;
-    color: {C_SOFT};
-    border: 1px solid {C_BORDER2};
-    border-radius: 4px;
+    color: {T['soft']};
+    border: 1px solid {T['border2']};
+    border-radius: 6px;
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.78rem;
-    letter-spacing: 0.04em;
     transition: all 0.12s ease;
 }}
 .stButton > button:hover {{
-    border-color: {C_GOLD};
-    color: {C_GOLD};
-    background-color: rgba(255,214,10,0.06);
+    border-color: {T['accent']};
+    color: {T['accent']};
+    background-color: {T['accent']}18;
 }}
 .stButton > button[kind="primary"] {{
-    background-color: {C_GOLD};
-    border-color: {C_GOLD};
-    color: {C_BG};
-    font-weight: 700;
+    background-color: {T['accent']};
+    border-color: {T['accent']};
+    color: #FFFFFF;
+    font-weight: 600;
 }}
-.stButton > button[kind="primary"]:hover {{
-    background-color: #FFE040;
-    border-color: #FFE040;
-}}
+.stButton > button[kind="primary"]:hover {{ filter: brightness(1.1); }}
 
 /* ── Inputs ── */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea {{
-    background-color: {C_CARD} !important;
-    border: 1px solid {C_BORDER2} !important;
-    color: {C_TEXT} !important;
-    border-radius: 4px;
+    background-color: {T['card']} !important;
+    border: 1px solid {T['border2']} !important;
+    border-radius: 6px !important;
+    color: {T['text']} !important;
+    -webkit-text-fill-color: {T['text']} !important;
+    caret-color: {T['text']} !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.82rem !important;
 }}
 .stTextInput > div > div > input:focus,
 .stTextArea > div > div > textarea:focus {{
-    border-color: {C_GOLD} !important;
-    box-shadow: 0 0 0 2px rgba(255,214,10,0.15) !important;
+    border-color: {T['accent']} !important;
+    box-shadow: 0 0 0 2px {T['accent']}28 !important;
+    outline: none !important;
 }}
+/* Fix autofill chrome white flash */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill {{
+    -webkit-box-shadow: 0 0 0 1000px {T['card']} inset !important;
+    -webkit-text-fill-color: {T['text']} !important;
+    caret-color: {T['text']} !important;
+}}
+/* Password browser overlay button */
+input::-webkit-credentials-auto-fill-button,
+input::-webkit-strong-password-auto-fill-button,
+input::-webkit-contacts-auto-fill-button {{
+    visibility: hidden;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+}}
+/* Input labels */
+.stTextInput label p, .stTextArea label p,
+[data-testid="stWidgetLabel"] p {{
+    color: {T['muted']} !important;
+    font-size: 0.72rem !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    letter-spacing: 0.04em;
+}}
+/* Placeholder */
+.stTextInput input::placeholder, .stTextArea textarea::placeholder {{
+    color: {T['border2']} !important;
+}}
+
+/* ── Selectbox ── */
 .stSelectbox > div > div {{
-    background-color: {C_CARD} !important;
-    border: 1px solid {C_BORDER2} !important;
-    border-radius: 4px;
+    background-color: {T['card']} !important;
+    border: 1px solid {T['border2']} !important;
+    border-radius: 6px !important;
+    color: {T['text']} !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.82rem !important;
 }}
-.stTextInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus {{
-    border-color: {C_GOLD} !important;
-    box-shadow: 0 0 0 2px rgba(255,214,10,0.15) !important;
-}}
+
+/* ── Radio ── */
+.stRadio label p {{ color: {T['soft']} !important; font-size: 0.82rem !important; }}
+.stRadio [role="radiogroup"] label {{ cursor: pointer; }}
 
 /* ── Tabs ── */
 .stTabs [data-baseweb="tab-list"] {{
     background: transparent;
-    border-bottom: 1px solid {C_BORDER};
-    gap: 0;
+    border-bottom: 1px solid {T['border']};
 }}
 .stTabs [data-baseweb="tab"] {{
     background: transparent;
-    color: {C_MUTED};
+    color: {T['muted']};
     border-bottom: 2px solid transparent;
-    padding: 10px 20px;
+    padding: 10px 18px;
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem;
-    font-weight: 400;
+    font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }}
 .stTabs [aria-selected="true"] {{
     background: transparent !important;
-    color: {C_GOLD} !important;
-    border-bottom-color: {C_GOLD} !important;
+    color: {T['accent']} !important;
+    border-bottom-color: {T['accent']} !important;
 }}
-.stTabs [data-baseweb="tab-panel"] {{ padding-top: 24px; }}
+.stTabs [data-baseweb="tab-panel"] {{ padding-top: 20px; }}
 
 /* ── Expanders ── */
 [data-testid="stExpander"] {{
-    background-color: {C_CARD};
-    border: 1px solid {C_BORDER};
-    border-radius: 4px;
+    background-color: {T['card']};
+    border: 1px solid {T['border']};
+    border-radius: 6px;
 }}
-[data-testid="stExpander"] summary {{ color: {C_SOFT}; font-size: 0.82rem; }}
+[data-testid="stExpander"] summary {{ color: {T['soft']}; font-size: 0.85rem; }}
 
 /* ── Divider ── */
-hr {{ border-color: {C_BORDER} !important; margin: 16px 0; }}
+hr {{ border-color: {T['border']} !important; margin: 14px 0; }}
 
-/* ── Code / tags ── */
+/* ── Code ── */
 code {{
-    background-color: {C_CARD} !important;
-    color: {C_GOLD} !important;
-    border: 1px solid {C_BORDER2} !important;
-    border-radius: 3px;
-    padding: 2px 7px;
+    background-color: {T['surface']} !important;
+    color: {T['accent']} !important;
+    border: 1px solid {T['border']} !important;
+    border-radius: 4px;
+    padding: 2px 6px;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.78rem;
 }}
 
 /* ── Alerts ── */
 [data-testid="stAlert"] {{
-    background-color: {C_CARD} !important;
-    border: 1px solid {C_BORDER2} !important;
-    border-radius: 4px;
-    color: {C_SOFT} !important;
-    font-size: 0.85rem;
+    background-color: {T['card']} !important;
+    border: 1px solid {T['border2']} !important;
+    border-radius: 6px;
+    color: {T['soft']} !important;
 }}
 
-/* ── Dataframe ── */
-[data-testid="stDataFrame"] {{
-    border: 1px solid {C_BORDER};
-    border-radius: 4px;
-    overflow: hidden;
-}}
-
-/* ── Radio ── */
-.stRadio label {{ font-size: 0.82rem !important; color: {C_SOFT} !important; }}
-.stRadio [data-testid="stMarkdownContainer"] p {{ color: {C_SOFT}; font-size: 0.82rem; }}
-
-/* ── Select ── */
-[data-testid="stSelectbox"] label {{ color: {C_MUTED} !important; font-size: 0.72rem; }}
+/* ── Loading spinner ── */
+.stSpinner > div {{ border-top-color: {T['accent']} !important; }}
 
 /* ── Scrollbar ── */
-::-webkit-scrollbar {{ width: 4px; height: 4px; }}
-::-webkit-scrollbar-track {{ background: {C_BG}; }}
-::-webkit-scrollbar-thumb {{ background: {C_BORDER2}; border-radius: 2px; }}
-::-webkit-scrollbar-thumb:hover {{ background: {C_MUTED}; }}
+::-webkit-scrollbar {{ width: 5px; height: 5px; }}
+::-webkit-scrollbar-track {{ background: {T['bg']}; }}
+::-webkit-scrollbar-thumb {{ background: {T['border2']}; border-radius: 3px; }}
+::-webkit-scrollbar-thumb:hover {{ background: {T['muted']}; }}
 </style>
 """
 
 
-# ── Persistence ───────────────────────────────────────────────────────────────
+# ── Settings persistence ──────────────────────────────────────────────────────
 
-def load_exclusions() -> dict:
-    if os.path.exists(EXCLUSIONS_FILE):
+def load_settings() -> dict:
+    if os.path.exists(SETTINGS_FILE):
         try:
-            with open(EXCLUSIONS_FILE) as f:
+            with open(SETTINGS_FILE) as f:
                 return json.load(f)
         except Exception:
             pass
-    return {"keywords": []}
+    return {"keywords": [], "theme": "Dark"}
 
 
-def save_exclusions(data: dict) -> None:
-    with open(EXCLUSIONS_FILE, "w") as f:
+def save_settings(data: dict) -> None:
+    with open(SETTINGS_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
 
@@ -290,7 +335,6 @@ def fetch_market_titles(creds_key: str, creds: dict, tickers: tuple) -> dict:
     title_map: dict = {}
     tickers_list = list(tickers)
 
-    # Batch fetch
     for i in range(0, len(tickers_list), 200):
         batch = tickers_list[i : i + 200]
         try:
@@ -303,7 +347,6 @@ def fetch_market_titles(creds_key: str, creds: dict, tickers: tuple) -> dict:
         except Exception:
             pass
 
-    # Individual fallback for anything still missing
     missing = [t for t in tickers_list if t not in title_map]
     for t in missing[:60]:
         try:
@@ -316,7 +359,6 @@ def fetch_market_titles(creds_key: str, creds: dict, tickers: tuple) -> dict:
         except Exception:
             pass
 
-    # Final fallback: ticker parser
     for t in tickers_list:
         if t not in title_map:
             title_map[t] = parse_ticker(t)
@@ -327,14 +369,9 @@ def fetch_market_titles(creds_key: str, creds: dict, tickers: tuple) -> dict:
 # ── Ticker / title helpers ────────────────────────────────────────────────────
 
 _SPORT_CODES = [
-    ("NCAAFGAME", "NCAAF"),
-    ("NCAAMGAME", "NCAAM"),
-    ("NFLGAME",   "NFL"),
-    ("NBAGAME",   "NBA"),
-    ("NHLGAME",   "NHL"),
-    ("MLBGAME",   "MLB"),
-    ("NBACUP",    "NBA Cup"),
-    ("NACUP",     "NBA Cup"),
+    ("NCAAFGAME", "NCAAF"), ("NCAAMGAME", "NCAAM"), ("NCAAMBGAME", "NCAAM"),
+    ("NCAAWBGAME", "NCAAW"), ("NFLGAME", "NFL"), ("NBAGAME", "NBA"),
+    ("NHLGAME", "NHL"), ("MLBGAME", "MLB"), ("NBACUP", "NBA Cup"), ("NACUP", "NBA Cup"),
 ]
 _MONTHS = {
     "JAN": "Jan", "FEB": "Feb", "MAR": "Mar", "APR": "Apr",
@@ -344,7 +381,6 @@ _MONTHS = {
 
 
 def parse_ticker(ticker: str) -> str:
-    """Convert a raw Kalshi ticker into a human-readable label."""
     t = ticker.upper()
     if not t.startswith("KX"):
         return ticker
@@ -365,23 +401,18 @@ def parse_ticker(ticker: str) -> str:
                 m = re.match(r"(\d{2})([A-Z]{3})(\d{2})(.*)", date_teams)
                 if m:
                     yy, mon, dd, teams = m.groups()
-                    mon_str = _MONTHS.get(mon, mon)
-                    dd_int = int(dd)
-                    return f"{sport} · {teams} · {result} wins ({mon_str} {dd_int}, 20{yy})"
+                    return f"{sport} · {teams} · {result} wins ({_MONTHS.get(mon, mon)} {int(dd)}, 20{yy})"
             break
 
     return ticker
 
 
 def normalize_market_title(raw_title: str, ticker: str) -> str:
-    """Convert any Kalshi market title into one consistent, readable format."""
     title = (raw_title or "").strip()
     if not title or title == ticker:
         return parse_ticker(ticker)
 
-    # ── Multi-pick: "yes Cleveland, yes OKC, yes MIN, ..." ────────────────────
-    # These come from bundle / parlay markets. Strip the "yes "/"no " prefixes
-    # and join clearly.
+    # Multi-pick: "yes Cleveland, yes OKC, ..."
     if re.match(r"^(yes|no)\s+\S", title, re.IGNORECASE):
         parts = [p.strip() for p in title.split(",")]
         picks = []
@@ -392,7 +423,7 @@ def normalize_market_title(raw_title: str, ticker: str) -> str:
             return " · ".join(picks)
         return " · ".join(picks[:3]) + f"  (+{len(picks) - 3} more)"
 
-    # ── Game matchup: "X at/vs Y [C] Winner?" ────────────────────────────────
+    # Game matchup: "X at/vs Y [C] Winner?"
     m = re.match(
         r"^(.+?)\s+(?:at|vs\.?)\s+(.+?)(?:\s+[A-Z]{1,2})?\s+Winner\??$",
         title, re.IGNORECASE,
@@ -402,19 +433,12 @@ def normalize_market_title(raw_title: str, ticker: str) -> str:
         t2 = re.sub(r"\s+[A-Z]{1,2}$", "", m.group(2).strip()).strip()
         return f"{t1} vs {t2}"
 
-    # ── Standalone "X Winner" / "X Winner?" ──────────────────────────────────
     title = re.sub(r"\s+Winner\??$", "", title, flags=re.IGNORECASE).strip()
 
-    # ── All-caps → title case ─────────────────────────────────────────────────
     if title == title.upper() and len(title) > 4:
         title = title.title()
 
     return re.sub(r"\s+", " ", title).strip()
-
-
-# Keep as thin alias so fetch_market_titles can call it
-def clean_title(title: str) -> str:
-    return title.strip().rstrip(" -_")
 
 
 # ── Data processing ───────────────────────────────────────────────────────────
@@ -433,7 +457,6 @@ def process_settlements(settlements: list, creds_key: str, creds: dict) -> pd.Da
 
         revenue = yes_count if result == "yes" else (no_count if result == "no" else 0.0)
 
-        # Determine primary held position (use cost as tiebreaker)
         if yes_cost > 0 and no_cost == 0:
             held, contracts = "YES", yes_count
             entry_cents = (yes_cost / yes_count * 100) if yes_count > 0 else 0.0
@@ -471,8 +494,8 @@ def process_settlements(settlements: list, creds_key: str, creds: dict) -> pd.Da
     df["settled_time"] = pd.to_datetime(df["settled_time"], utc=True, errors="coerce")
     df = df.dropna(subset=["settled_time"])
     df["settled_time"] = df["settled_time"].dt.tz_localize(None)
-    df["year"]       = df["settled_time"].dt.year
-    df["year_month"] = df["settled_time"].dt.to_period("M")
+    df["year"]        = df["settled_time"].dt.year
+    df["year_month"]  = df["settled_time"].dt.to_period("M")
     df["month_label"] = df["year_month"].apply(lambda p: p.strftime("%b %Y"))
     df = df.sort_values("settled_time").reset_index(drop=True)
 
@@ -507,146 +530,155 @@ def keyword_match_count(df: pd.DataFrame, kw: str) -> int:
 
 # ── Charts ────────────────────────────────────────────────────────────────────
 
-def _plotly_layout(title: str) -> dict:
-    mono = "JetBrains Mono, monospace"
-    return dict(
-        title=dict(
-            text=title.upper(),
-            font=dict(family=mono, color=C_MUTED, size=10),
-            x=0, xanchor="left",
-        ),
-        height=400,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(family=mono, color=C_MUTED, size=11),
-        yaxis=dict(
-            title="",
-            zeroline=True, zerolinecolor=C_BORDER2, zerolinewidth=1,
-            gridcolor=C_BORDER, gridwidth=1,
-            tickfont=dict(family=mono, color=C_MUTED, size=10),
-            tickprefix="$",
-        ),
-        yaxis2=dict(
-            title="",
-            overlaying="y", side="right",
-            gridcolor="rgba(0,0,0,0)",
-            tickfont=dict(family=mono, color=C_LINE, size=10),
-            tickprefix="$",
-        ),
-        xaxis=dict(
-            showgrid=False,
-            tickfont=dict(family=mono, color=C_MUTED, size=10),
-        ),
-        hovermode="x unified",
-        hoverlabel=dict(
-            bgcolor=C_CARD, bordercolor=C_BORDER2,
-            font=dict(family=mono, color=C_TEXT, size=11),
-        ),
-        legend=dict(
-            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-            font=dict(family=mono, color=C_MUTED, size=10),
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        margin=dict(t=36, b=32, l=4, r=4),
-        bargap=0.35,
-    )
-
-
-def pnl_bar_chart(grouped: pd.DataFrame, x_col: str, title: str) -> go.Figure:
+def pnl_bar_chart(grouped: pd.DataFrame, x_col: str, title: str, T: dict) -> go.Figure:
     grouped = grouped.copy()
     grouped["cumulative"] = grouped["pnl"].cumsum()
+    mono = "JetBrains Mono, monospace"
 
     fig = go.Figure()
-    # Bars with per-bar color
     for _, row in grouped.iterrows():
-        color = C_PROFIT if row["pnl"] >= 0 else C_LOSS
+        color = T["profit"] if row["pnl"] >= 0 else T["loss"]
         fig.add_trace(go.Bar(
             x=[row[x_col]], y=[row["pnl"]],
-            marker_color=color,
-            marker_line_width=0,
-            marker_opacity=0.85,
+            marker_color=color, marker_line_width=0, marker_opacity=0.9,
             showlegend=False,
             hovertemplate=f"<b>{row[x_col]}</b><br>PnL: ${row['pnl']:,.2f}<extra></extra>",
         ))
 
-    # Cumulative line
     fig.add_trace(go.Scatter(
         x=grouped[x_col], y=grouped["cumulative"],
-        mode="lines", name="cumulative",
-        line=dict(color=C_LINE, width=1.5),
+        mode="lines", name="Cumulative",
+        line=dict(color=T["line"], width=1.5),
         yaxis="y2",
         hovertemplate="<b>%{x}</b><br>Running: $%{y:,.2f}<extra></extra>",
     ))
 
-    # Zero line annotation-style fill for emphasis
-    fig.add_hline(y=0, line_color=C_BORDER2, line_width=1, layer="below")
-
-    layout = _plotly_layout(title)
-    layout["showlegend"] = False
-    fig.update_layout(**layout)
+    fig.update_layout(
+        title=dict(text=title.upper(), font=dict(family=mono, color=T["muted"], size=10), x=0),
+        height=390,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(family=mono, color=T["muted"], size=11),
+        yaxis=dict(
+            title="", zeroline=True, zerolinecolor=T["border2"], zerolinewidth=1,
+            gridcolor=T["border"], tickfont=dict(size=10), tickprefix="$",
+        ),
+        yaxis2=dict(
+            title="", overlaying="y", side="right",
+            gridcolor="rgba(0,0,0,0)",
+            tickfont=dict(color=T["line"], size=10), tickprefix="$",
+        ),
+        xaxis=dict(showgrid=False, tickfont=dict(size=10)),
+        hovermode="x unified",
+        hoverlabel=dict(bgcolor=T["card"], bordercolor=T["border2"],
+                        font=dict(family=mono, color=T["text"], size=11)),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+                    font=dict(size=10), bgcolor="rgba(0,0,0,0)"),
+        showlegend=False,
+        margin=dict(t=36, b=32, l=4, r=4),
+        bargap=0.35,
+    )
     return fig
 
 
-def metric_card(label: str, value: str, sub: str = "",
-                accent: str = C_GOLD, value_color: str = C_TEXT) -> str:
-    sub_html = (f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.7rem;'
-                f'color:{C_MUTED};margin-top:5px">{sub}</div>') if sub else ""
+# ── HTML rendering helpers ────────────────────────────────────────────────────
+
+def metric_card(label: str, value: str, sub: str, T: dict,
+                accent: str | None = None, value_color: str | None = None) -> str:
+    ac  = accent or T["accent"]
+    vc  = value_color or T["text"]
+    sub_html = (
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.7rem;'
+        f'color:{T["muted"]};margin-top:4px">{sub}</div>'
+    ) if sub else ""
     return (
-        f'<div style="background:{C_CARD};border:1px solid {C_BORDER};'
-        f'border-top:2px solid {accent};border-radius:4px;padding:18px 20px 16px">'
-        f'<div style="font-family:\'Bricolage Grotesque\',sans-serif;font-size:1.9rem;'
-        f'font-weight:700;color:{value_color};line-height:1;letter-spacing:-0.02em">{value}</div>'
-        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.62rem;'
-        f'color:{C_MUTED};text-transform:uppercase;letter-spacing:0.12em;margin-top:8px">{label}</div>'
+        f'<div style="background:{T["card"]};border:1px solid {T["border"]};'
+        f'border-top:2px solid {ac};border-radius:8px;padding:16px 18px 14px;height:100%">'
+        f'<div style="font-family:\'Bricolage Grotesque\',sans-serif;font-size:1.75rem;'
+        f'font-weight:700;color:{vc};line-height:1;letter-spacing:-0.02em">{value}</div>'
+        f'<div style="font-family:\'JetBrains Mono\',monospace;font-size:0.6rem;'
+        f'color:{T["muted"]};text-transform:uppercase;letter-spacing:0.12em;margin-top:8px">{label}</div>'
         f'{sub_html}</div>'
     )
 
 
-def format_trade_table(df: pd.DataFrame) -> pd.DataFrame:
+def html_table(df: pd.DataFrame, T: dict) -> str:
+    """Render a DataFrame as a fully themed HTML table."""
+    COLOR_RULES: dict[str, object] = {
+        "PnL":     lambda v: T["profit"] if str(v).startswith("+") else T["loss"],
+        "W/L":     lambda v: T["profit"] if v == "WIN" else (T["loss"] if v == "LOSS" else T["muted"]),
+        "Held":    lambda v: T["accent"],
+        "Outcome": lambda v: T["profit"] if v == "YES" else T["loss"],
+    }
+    MONO_COLS = {"PnL", "W/L", "Held", "Outcome", "Contracts", "Entry", "Cost",
+                 "PnL", "Month", "Year", "Markets", "Wins", "Win %", "Running Total"}
+
+    ths = "".join(
+        f'<th style="padding:9px 14px;text-align:left;'
+        f'font-family:\'JetBrains Mono\',monospace;font-size:0.6rem;'
+        f'text-transform:uppercase;letter-spacing:0.1em;color:{T["muted"]};'
+        f'background:{T["surface"]};border-bottom:1px solid {T["border2"]};'
+        f'white-space:nowrap;font-weight:500">{col}</th>'
+        for col in df.columns
+    )
+
+    rows_html = []
+    for i, (_, row) in enumerate(df.iterrows()):
+        row_bg = T["card"] if i % 2 == 0 else T["surface"]
+        cells = []
+        for col in df.columns:
+            val = row[col]
+            val_str = str(val)
+            base = (
+                f"padding:8px 14px;border-bottom:1px solid {T['border']};"
+                f"background:{row_bg};font-size:0.8rem;white-space:nowrap"
+            )
+            if col in COLOR_RULES:
+                color = COLOR_RULES[col](val_str)
+                weight = ";font-weight:600" if col == "PnL" else ""
+                style = f"{base};color:{color}{weight};font-family:'JetBrains Mono',monospace"
+            elif col == "Market":
+                style = (
+                    f"{base};color:{T['text']};font-family:'Bricolage Grotesque',sans-serif;"
+                    f"max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                )
+            elif col == "Date":
+                style = f"{base};color:{T['soft']};font-family:'JetBrains Mono',monospace"
+            elif col in MONO_COLS:
+                style = f"{base};color:{T['muted']};font-family:'JetBrains Mono',monospace"
+            else:
+                style = f"{base};color:{T['text']}"
+            cells.append(f'<td style="{style}" title="{val_str}">{val_str}</td>')
+        rows_html.append("<tr>" + "".join(cells) + "</tr>")
+
+    return (
+        f'<div style="overflow-x:auto;border:1px solid {T["border"]};'
+        f'border-radius:8px;background:{T["card"]}">'
+        f'<table style="width:100%;border-collapse:collapse">'
+        f'<thead><tr>{ths}</tr></thead>'
+        f'<tbody>{"".join(rows_html)}</tbody>'
+        f'</table></div>'
+    )
+
+
+# ── Table data builders ───────────────────────────────────────────────────────
+
+def build_trade_df(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
-
-    # Date — readable, no leading zeros
-    out["Date"] = out["settled_time"].apply(
-        lambda dt: f"{dt.strftime('%b')} {dt.day}, {dt.year}"
-    )
-
-    # Held — what the user bought
-    out["Held"] = out["held"]
-
-    # Outcome — what the market resolved to
-    out["Outcome"] = out["result"]   # "YES" or "NO"
-
-    # Win / Loss
-    out["W/L"] = out["pnl"].apply(lambda x: "WIN" if x > 0 else ("LOSS" if x < 0 else "PUSH"))
-
-    # Contracts — round to int when clean, keep 2dp otherwise
-    def fmt_contracts(v: float) -> str:
-        return str(int(v)) if v == int(v) else f"{v:.1f}"
-
-    out["Contracts"] = out["contracts"].apply(fmt_contracts)
-
-    # Entry price in cents (0–100¢)
-    out["Entry"] = out["entry_cents"].apply(
-        lambda x: f"¢{x:.1f}" if x > 0 else "—"
-    )
-
-    # Cost = what they spent (YES + NO costs + fee)
-    out["Cost"] = out["cost"].map("${:,.2f}".format)
-
-    # PnL with explicit +/- sign
-    out["PnL"] = out["pnl"].apply(
-        lambda x: f"+${x:,.2f}" if x > 0 else f"-${abs(x):,.2f}"
-    )
-
-    return out[["Date", "title", "Held", "Outcome", "W/L",
-                "Contracts", "Entry", "Cost", "PnL"]].rename(
+    out["Date"]      = out["settled_time"].apply(lambda d: f"{d.strftime('%b')} {d.day}, {d.year}")
+    out["Held"]      = out["held"]
+    out["Outcome"]   = out["result"]
+    out["W/L"]       = out["pnl"].apply(lambda x: "WIN" if x > 0 else ("LOSS" if x < 0 else "PUSH"))
+    out["Contracts"] = out["contracts"].apply(lambda x: str(int(x)) if x == int(x) else f"{x:.1f}")
+    out["Entry"]     = out["entry_cents"].apply(lambda x: f"¢{x:.1f}" if x > 0 else "—")
+    out["Cost"]      = out["cost"].map("${:,.2f}".format)
+    out["PnL"]       = out["pnl"].apply(lambda x: f"+${x:,.2f}" if x > 0 else f"-${abs(x):,.2f}")
+    return out[["Date", "title", "Held", "Outcome", "W/L", "Contracts", "Entry", "Cost", "PnL"]].rename(
         columns={"title": "Market"}
     )
 
 
-# ── Summary table helpers ─────────────────────────────────────────────────────
-
-def monthly_table(df: pd.DataFrame) -> pd.DataFrame:
+def build_monthly_df(df: pd.DataFrame) -> pd.DataFrame:
     g = (
         df.groupby(["year_month", "month_label"])
         .agg(pnl=("pnl", "sum"), markets=("ticker", "count"),
@@ -657,14 +689,14 @@ def monthly_table(df: pd.DataFrame) -> pd.DataFrame:
     g["cumulative"] = g["pnl"].cumsum()
     g["month_label"] = g["year_month"].apply(lambda p: p.strftime("%b %Y"))
     out = g[["month_label", "pnl", "markets", "wins", "win_pct", "cumulative"]].iloc[::-1].reset_index(drop=True)
-    out["pnl"]        = out["pnl"].map("${:,.2f}".format)
-    out["cumulative"] = out["cumulative"].map("${:,.2f}".format)
+    out["pnl"]        = out["pnl"].apply(lambda x: f"+${x:,.2f}" if x >= 0 else f"-${abs(x):,.2f}")
+    out["cumulative"] = out["cumulative"].apply(lambda x: f"+${x:,.2f}" if x >= 0 else f"-${abs(x):,.2f}")
     out["win_pct"]    = out["win_pct"].map("{:.1f}%".format)
     out.columns = ["Month", "PnL", "Markets", "Wins", "Win %", "Running Total"]
     return out
 
 
-def yearly_table(df: pd.DataFrame) -> pd.DataFrame:
+def build_yearly_df(df: pd.DataFrame) -> pd.DataFrame:
     g = (
         df.groupby("year")
         .agg(pnl=("pnl", "sum"), markets=("ticker", "count"),
@@ -675,11 +707,22 @@ def yearly_table(df: pd.DataFrame) -> pd.DataFrame:
     g["cumulative"] = g["pnl"].cumsum()
     g["year"]       = g["year"].astype(str)
     out = g[["year", "pnl", "markets", "wins", "win_pct", "cumulative"]].iloc[::-1].reset_index(drop=True)
-    out["pnl"]        = out["pnl"].map("${:,.2f}".format)
-    out["cumulative"] = out["cumulative"].map("${:,.2f}".format)
+    out["pnl"]        = out["pnl"].apply(lambda x: f"+${x:,.2f}" if x >= 0 else f"-${abs(x):,.2f}")
+    out["cumulative"] = out["cumulative"].apply(lambda x: f"+${x:,.2f}" if x >= 0 else f"-${abs(x):,.2f}")
     out["win_pct"]    = out["win_pct"].map("{:.1f}%".format)
     out.columns = ["Year", "PnL", "Markets", "Wins", "Win %", "Running Total"]
     return out
+
+
+# ── Sidebar component helpers ─────────────────────────────────────────────────
+
+def section_label(text: str, T: dict) -> None:
+    st.markdown(
+        f"<p style='font-family:\"JetBrains Mono\",monospace;color:{T['muted']};"
+        f"font-size:0.6rem;text-transform:uppercase;letter-spacing:0.14em;"
+        f"margin:0 0 6px'>{ text}</p>",
+        unsafe_allow_html=True,
+    )
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -689,45 +732,60 @@ def main() -> None:
         page_title="Kalshi PnL", page_icon="📈",
         layout="wide", initial_sidebar_state="expanded",
     )
-    st.markdown(THEME_CSS, unsafe_allow_html=True)
 
-    if "exclusions" not in st.session_state:
-        st.session_state.exclusions = load_exclusions()
+    if "settings" not in st.session_state:
+        st.session_state.settings = load_settings()
     if "creds" not in st.session_state:
         st.session_state.creds = None
-    # All-time df for exclusion match counts (populated after first data load)
     if "full_df" not in st.session_state:
         st.session_state.full_df = pd.DataFrame()
 
+    # ── Theme ──
+    theme_name = st.session_state.settings.get("theme", "Dark")
+    T = THEMES[theme_name]
+
+    st.markdown(build_css(T), unsafe_allow_html=True)
+
     # ── Sidebar ───────────────────────────────────────────────────────────────
     with st.sidebar:
+        # Wordmark
         st.markdown(
-            f"<div style='padding:4px 0 12px'>"
-            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;font-size:1.15rem;"
-            f"font-weight:800;color:{C_TEXT};letter-spacing:-0.01em'>KALSHI PNL</div>"
-            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.62rem;"
-            f"color:{C_MUTED};letter-spacing:0.14em;margin-top:2px'>PREDICTION MARKET TRACKER</div>"
-            f"</div>",
+            f"<div style='padding:2px 0 10px'>"
+            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
+            f"font-size:1.1rem;font-weight:800;color:{T['text']};letter-spacing:-0.01em'>"
+            f"Kalshi PnL</div>"
+            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.58rem;"
+            f"color:{T['muted']};letter-spacing:0.14em;margin-top:2px'>"
+            f"PREDICTION MARKET TRACKER</div></div>",
             unsafe_allow_html=True,
         )
         st.divider()
 
+        # ── Theme toggle ──
+        section_label("Theme", T)
+        new_theme = st.radio(
+            "t", list(THEMES.keys()),
+            index=list(THEMES.keys()).index(theme_name),
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+        if new_theme != theme_name:
+            st.session_state.settings["theme"] = new_theme
+            save_settings(st.session_state.settings)
+            st.rerun()
+
+        st.divider()
+
         # ── Auth ──
         if not st.session_state.creds:
-            st.markdown(f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
-                        f"font-size:0.62rem;font-weight:400;text-transform:uppercase;"
-                        f"letter-spacing:0.14em;margin-bottom:8px'>LOGIN</p>",
-                        unsafe_allow_html=True)
-            auth_mode = st.radio("", ["API Key (RSA)", "Email / Password"],
-                                 label_visibility="collapsed")
-
+            section_label("Login", T)
+            auth_mode = st.radio("a", ["API Key (RSA)", "Email / Password"],
+                                 horizontal=True, label_visibility="collapsed")
             if auth_mode == "API Key (RSA)":
-                key_id = st.text_input("Key ID", placeholder="key_xxxxxxxxxxxxxxxx")
-                pem = st.text_area(
-                    "Private Key",
-                    placeholder="-----BEGIN RSA PRIVATE KEY-----\n...",
-                    height=140,
-                )
+                key_id = st.text_input("Key ID", placeholder="key_xxxxxxxxxxxx")
+                pem = st.text_area("Private Key (PEM)",
+                                   placeholder="-----BEGIN RSA PRIVATE KEY-----\n...",
+                                   height=130)
                 if st.button("Connect", type="primary", use_container_width=True):
                     if not key_id.strip() or not pem.strip():
                         st.error("Both fields are required.")
@@ -757,11 +815,12 @@ def main() -> None:
                         st.error(f"Login failed: {err}")
         else:
             st.markdown(
-                f"<div style='background:{C_CARD};border:1px solid {C_BORDER};"
-                f"border-top:1px solid {C_PROFIT};border-radius:4px;"
-                f"padding:8px 14px;margin-bottom:10px'>"
-                f"<span style='font-family:\"JetBrains Mono\",monospace;color:{C_PROFIT};"
-                f"font-size:0.72rem;letter-spacing:0.08em'>● CONNECTED</span></div>",
+                f"<div style='background:{T['card']};border:1px solid {T['border']};"
+                f"border-left:3px solid {T['profit']};border-radius:0 6px 6px 0;"
+                f"padding:8px 12px;margin-bottom:8px'>"
+                f"<span style='font-family:\"JetBrains Mono\",monospace;"
+                f"color:{T['profit']};font-size:0.72rem;letter-spacing:0.06em'>"
+                f"● Connected</span></div>",
                 unsafe_allow_html=True,
             )
             if st.button("Logout", use_container_width=True):
@@ -773,118 +832,104 @@ def main() -> None:
         st.divider()
 
         # ── Exclusions ──
+        section_label("Exclusions", T)
         st.markdown(
-            f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
-            f"font-size:0.62rem;text-transform:uppercase;letter-spacing:0.14em;"
-            f"margin-bottom:4px'>Exclusions</p>"
-            f"<p style='color:{C_MUTED};font-size:0.78rem;line-height:1.5;margin-bottom:10px'>"
-            f"Filter trades out of your PnL — e.g. trades made for a friend.</p>",
+            f"<p style='color:{T['muted']};font-size:0.78rem;line-height:1.5;margin-bottom:8px'>"
+            f"Remove trades from PnL — e.g. trades placed for a friend.</p>",
             unsafe_allow_html=True,
         )
-
-        keywords: list = st.session_state.exclusions.get("keywords", [])
-        full_df = st.session_state.full_df
+        keywords: list = st.session_state.settings.get("keywords", [])
+        full_df  = st.session_state.full_df
 
         col_a, col_b = st.columns([3, 1])
-        new_kw = col_a.text_input(
-            "kw", placeholder="e.g. NBA, NFL, TRUMP",
-            label_visibility="collapsed", key="kw_input",
-        )
+        new_kw = col_a.text_input("kw", placeholder="e.g. NBA, NFL",
+                                  label_visibility="collapsed", key="kw_input")
         if col_b.button("Add", use_container_width=True, key="kw_add"):
             kw = new_kw.strip()
             if kw and kw not in keywords:
                 keywords.append(kw)
-                st.session_state.exclusions["keywords"] = keywords
-                save_exclusions(st.session_state.exclusions)
+                st.session_state.settings["keywords"] = keywords
+                save_settings(st.session_state.settings)
                 st.rerun()
 
         for i, kw in enumerate(keywords[:]):
             count = keyword_match_count(full_df, kw) if not full_df.empty else 0
             c1, c2 = st.columns([5, 1])
+            badge_color = T["loss"] if count > 0 else T["muted"]
             c1.markdown(
-                f"<div style='background:{C_CARD};border:1px solid {C_BORDER};"
-                f"border-left:2px solid {C_GOLD};border-radius:0 4px 4px 0;"
-                f"padding:6px 10px;margin-bottom:2px'>"
+                f"<div style='background:{T['card']};border:1px solid {T['border']};"
+                f"border-left:2px solid {T['accent']};border-radius:0 4px 4px 0;"
+                f"padding:5px 10px;margin-bottom:2px'>"
                 f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.78rem;"
-                f"color:{C_TEXT}'>{kw}</div>"
-                f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.62rem;"
-                f"color:{C_MUTED if count == 0 else C_LOSS}'>"
-                f"{'no matches' if count == 0 else f'{count} trades excluded'}</div>"
-                f"</div>",
+                f"color:{T['text']}'>{kw}</div>"
+                f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.6rem;"
+                f"color:{badge_color}'>"
+                f"{'no matches' if count == 0 else f'{count} trades excluded'}</div></div>",
                 unsafe_allow_html=True,
             )
-            if c2.button("×", key=f"rm_{i}", help="Remove"):
+            if c2.button("×", key=f"rm_{i}"):
                 keywords.pop(i)
-                st.session_state.exclusions["keywords"] = keywords
-                save_exclusions(st.session_state.exclusions)
+                st.session_state.settings["keywords"] = keywords
+                save_settings(st.session_state.settings)
                 st.rerun()
 
         if not keywords:
             st.markdown(
-                f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
-                f"font-size:0.72rem;font-style:italic'>none set</p>",
+                f"<p style='font-family:\"JetBrains Mono\",monospace;"
+                f"color:{T['muted']};font-size:0.72rem;font-style:italic'>None set.</p>",
                 unsafe_allow_html=True,
             )
 
         st.divider()
 
-        # ── Filters ──
-        st.markdown(
-            f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
-            f"font-size:0.62rem;text-transform:uppercase;letter-spacing:0.14em;"
-            f"margin-bottom:8px'>Filters</p>",
-            unsafe_allow_html=True,
-        )
+        # ── Year filter ──
+        section_label("Filter", T)
         all_years: list = st.session_state.get("all_years", [])
         year_opts = ["All years"] + [str(y) for y in sorted(all_years, reverse=True)]
-        selected_year = st.selectbox("Year", year_opts, label_visibility="collapsed")
+        selected_year = st.selectbox("y", year_opts, label_visibility="collapsed")
 
         st.divider()
-        if st.button("↺  Refresh", use_container_width=True):
+        if st.button("↺  Refresh data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
-        st.markdown(
-            f"<p style='font-family:\"JetBrains Mono\",monospace;color:{C_MUTED};"
-            f"font-size:0.6rem;letter-spacing:0.06em;margin-top:6px;text-align:center'>"
-            f"← collapse sidebar</p>",
-            unsafe_allow_html=True,
-        )
 
     # ── Main content ──────────────────────────────────────────────────────────
     if not st.session_state.creds:
         st.markdown(
-            f"<div style='padding:40px 0 20px'>"
-            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;font-size:3.2rem;"
-            f"font-weight:800;color:{C_TEXT};line-height:1;letter-spacing:-0.03em'>"
-            f"Track your<br><span style='color:{C_GOLD}'>edge.</span></div>"
-            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.82rem;"
-            f"color:{C_MUTED};margin-top:16px;line-height:1.6'>"
-            f"Kalshi PnL — per trade, per month, per year.</div>"
-            f"</div>",
+            f"<div style='padding:48px 0 24px'>"
+            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
+            f"font-size:3rem;font-weight:800;color:{T['text']};line-height:1.05;"
+            f"letter-spacing:-0.03em'>Track your<br>"
+            f"<span style='color:{T['accent']}'>prediction edge.</span></div>"
+            f"<p style='font-family:\"JetBrains Mono\",monospace;font-size:0.82rem;"
+            f"color:{T['muted']};margin-top:16px;line-height:1.7'>"
+            f"PnL per trade · per month · per year</p></div>",
             unsafe_allow_html=True,
         )
         st.divider()
         st.markdown(
-            f"<div style='background:{C_CARD};border:1px solid {C_BORDER};"
-            f"border-left:2px solid {C_GOLD};border-radius:0 4px 4px 0;padding:24px 28px;max-width:420px'>"
-            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.65rem;"
-            f"color:{C_MUTED};text-transform:uppercase;letter-spacing:0.14em;"
-            f"margin-bottom:14px'>Getting started</div>"
-            f"<ol style='color:{C_SOFT};font-size:0.85rem;line-height:2;margin:0;padding-left:18px'>"
-            f"<li>Log in at <span style='color:{C_TEXT}'>kalshi.com</span></li>"
-            f"<li>Go to <span style='color:{C_TEXT}'>Account → Settings → API</span></li>"
-            f"<li>Click <span style='color:{C_GOLD}'>Create API Key</span></li>"
-            f"<li>Paste your Key ID + Private Key in the sidebar</li>"
+            f"<div style='background:{T['card']};border:1px solid {T['border']};"
+            f"border-left:3px solid {T['accent']};border-radius:0 8px 8px 0;"
+            f"padding:24px 28px;max-width:400px'>"
+            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.6rem;"
+            f"color:{T['muted']};text-transform:uppercase;letter-spacing:0.14em;"
+            f"margin-bottom:12px'>Getting started</div>"
+            f"<ol style='color:{T['soft']};font-size:0.875rem;line-height:2.2;"
+            f"margin:0;padding-left:18px'>"
+            f"<li>Log in at <span style='color:{T['text']}'>kalshi.com</span></li>"
+            f"<li>Account → Settings → <span style='color:{T['text']}'>API</span></li>"
+            f"<li>Create an API key → copy Key ID + Private Key</li>"
+            f"<li>Paste both into the sidebar</li>"
             f"</ol>"
-            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.68rem;"
-            f"color:{C_MUTED};margin-top:16px;border-top:1px solid {C_BORDER};"
-            f"padding-top:12px'>Your private key never touches disk — used only to sign requests.</div>"
-            f"</div>",
+            f"<p style='font-family:\"JetBrains Mono\",monospace;font-size:0.65rem;"
+            f"color:{T['muted']};margin-top:14px;padding-top:12px;"
+            f"border-top:1px solid {T['border']}'>"
+            f"Your private key never touches disk.</p></div>",
             unsafe_allow_html=True,
         )
         return
 
-    creds = st.session_state.creds
+    creds     = st.session_state.creds
     creds_key = creds.get("key_id") or "bearer"
 
     settlements, err = fetch_all_settlements(creds_key, creds)
@@ -897,7 +942,7 @@ def main() -> None:
         return
 
     if not settlements:
-        st.info("No settled trades found yet — markets appear here after they resolve.")
+        st.info("No settled trades found yet.")
         return
 
     df = process_settlements(settlements, creds_key, creds)
@@ -905,65 +950,65 @@ def main() -> None:
         st.warning("No processable data.")
         return
 
-    # Store full df for exclusion match counts in sidebar
-    st.session_state.full_df = df
+    st.session_state.full_df  = df
     st.session_state.all_years = sorted(df["year"].unique().tolist())
 
-    # Apply year filter
     view_df = df[df["year"] == int(selected_year)].copy() if selected_year != "All years" else df.copy()
-
-    # Apply exclusions
-    keywords = st.session_state.exclusions.get("keywords", [])
+    keywords = st.session_state.settings.get("keywords", [])
     included, excluded = split_by_exclusions(view_df, keywords)
 
     if included.empty:
-        st.warning("All trades in this period are excluded. Adjust your exclusion filters.")
+        st.warning("All trades are excluded by your filters.")
         return
 
-    # ── Header ────────────────────────────────────────────────────────────────
-    total_pnl = included["pnl"].sum()
-    n = len(included)
-    wins = int((included["pnl"] > 0).sum())
+    # ── Header & metrics ──────────────────────────────────────────────────────
+    total_pnl  = included["pnl"].sum()
+    n          = len(included)
+    wins       = int((included["pnl"] > 0).sum())
     total_fees = included["fee"].sum()
-    pnl_color = C_PROFIT if total_pnl >= 0 else C_LOSS
-    pnl_sign  = "+" if total_pnl >= 0 else ""
+    avg_pnl    = included["pnl"].mean()
+    pnl_color  = T["profit"] if total_pnl >= 0 else T["loss"]
+    pnl_sign   = "+" if total_pnl >= 0 else ""
 
     st.markdown(
-        f"<div style='display:flex;align-items:baseline;gap:16px;padding:8px 0 4px'>"
-        f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;font-size:3rem;"
-        f"font-weight:800;color:{pnl_color};line-height:1;letter-spacing:-0.03em'>"
-        f"{pnl_sign}${total_pnl:,.2f}</div>"
-        f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.7rem;"
-        f"color:{C_MUTED};letter-spacing:0.1em'>{selected_year.upper()} · {n:,} MARKETS</div>"
-        f"</div>",
+        f"<div style='padding:8px 0 2px'>"
+        f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
+        f"font-size:2.8rem;font-weight:800;color:{pnl_color};line-height:1;"
+        f"letter-spacing:-0.03em'>{pnl_sign}${total_pnl:,.2f}</div>"
+        f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.68rem;"
+        f"color:{T['muted']};letter-spacing:0.1em;margin-top:4px'>"
+        f"{selected_year.upper()} · {n:,} SETTLED MARKETS</div></div>",
         unsafe_allow_html=True,
     )
 
-    # ── Metrics ───────────────────────────────────────────────────────────────
     c1, c2, c3, c4, c5 = st.columns(5)
-    avg = included["pnl"].mean()
-    c1.markdown(metric_card("Win Rate",    f"{wins/n*100:.1f}%",   f"{wins}W  {n-wins}L"), unsafe_allow_html=True)
-    c2.markdown(metric_card("Avg / Trade", f"${avg:,.2f}",         accent=C_PROFIT if avg >= 0 else C_LOSS, value_color=C_PROFIT if avg >= 0 else C_LOSS), unsafe_allow_html=True)
-    c3.markdown(metric_card("Best Trade",  f"${included['pnl'].max():,.2f}", accent=C_PROFIT, value_color=C_PROFIT), unsafe_allow_html=True)
-    c4.markdown(metric_card("Worst Trade", f"${included['pnl'].min():,.2f}", accent=C_LOSS,   value_color=C_LOSS),   unsafe_allow_html=True)
-    c5.markdown(metric_card("Total Fees",  f"${total_fees:,.2f}",  accent=C_BORDER2),  unsafe_allow_html=True)
+    c1.markdown(metric_card("Win Rate",    f"{wins/n*100:.1f}%",   f"{wins}W  /  {n-wins}L", T), unsafe_allow_html=True)
+    c2.markdown(metric_card("Avg / Trade", f"${avg_pnl:,.2f}",    "", T,
+                            accent=T["profit"] if avg_pnl >= 0 else T["loss"],
+                            value_color=T["profit"] if avg_pnl >= 0 else T["loss"]), unsafe_allow_html=True)
+    c3.markdown(metric_card("Best Trade",  f"${included['pnl'].max():,.2f}", "", T,
+                            accent=T["profit"], value_color=T["profit"]), unsafe_allow_html=True)
+    c4.markdown(metric_card("Worst Trade", f"${included['pnl'].min():,.2f}", "", T,
+                            accent=T["loss"], value_color=T["loss"]),   unsafe_allow_html=True)
+    c5.markdown(metric_card("Total Fees",  f"${total_fees:,.2f}",  "", T,
+                            accent=T["border2"]), unsafe_allow_html=True)
 
     if not excluded.empty:
         excl_pnl = excluded["pnl"].sum()
         st.markdown(
-            f"<div style='background:{C_CARD};border:1px solid {C_BORDER};"
-            f"border-left:2px solid {C_GOLD};border-radius:0 4px 4px 0;"
+            f"<div style='background:{T['card']};border:1px solid {T['border']};"
+            f"border-left:3px solid {T['warn']};border-radius:0 6px 6px 0;"
             f"padding:9px 14px;margin-top:10px'>"
             f"<span style='font-family:\"JetBrains Mono\",monospace;font-size:0.72rem;"
-            f"color:{C_MUTED}'>"
+            f"color:{T['muted']}'>"
             f"{len(excluded)} markets excluded  ·  "
-            f"excl. PnL <span style='color:{C_GOLD}'>${excl_pnl:,.2f}</span>  ·  "
-            f"grand total <span style='color:{C_TEXT}'>${view_df['pnl'].sum():,.2f}</span>"
+            f"excl. PnL: <span style='color:{T['warn']}'>${excl_pnl:,.2f}</span>  ·  "
+            f"grand total: <span style='color:{T['text']}'>${view_df['pnl'].sum():,.2f}</span>"
             f"</span></div>",
             unsafe_allow_html=True,
         )
 
-    st.markdown("<div style='margin-top:24px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 
     # ── Tabs ──────────────────────────────────────────────────────────────────
     tab_mo, tab_yr, tab_all = st.tabs(["  Monthly  ", "  Yearly  ", "  All Trades  "])
@@ -976,11 +1021,8 @@ def main() -> None:
             .reset_index().sort_values("year_month")
         )
         mo_data["month_label"] = mo_data["year_month"].apply(lambda p: p.strftime("%b %Y"))
-        st.plotly_chart(
-            pnl_bar_chart(mo_data, "month_label", "Monthly PnL"),
-            use_container_width=True,
-        )
-        st.dataframe(monthly_table(included), use_container_width=True, hide_index=True)
+        st.plotly_chart(pnl_bar_chart(mo_data, "month_label", "Monthly PnL", T), use_container_width=True)
+        st.markdown(html_table(build_monthly_df(included), T), unsafe_allow_html=True)
 
     with tab_yr:
         yr_data = (
@@ -990,50 +1032,43 @@ def main() -> None:
             .reset_index().sort_values("year")
         )
         yr_data["year_label"] = yr_data["year"].astype(str)
-        st.plotly_chart(
-            pnl_bar_chart(yr_data, "year_label", "Yearly PnL"),
-            use_container_width=True,
-        )
-        st.dataframe(yearly_table(included), use_container_width=True, hide_index=True)
+        st.plotly_chart(pnl_bar_chart(yr_data, "year_label", "Yearly PnL", T), use_container_width=True)
+        st.markdown(html_table(build_yearly_df(included), T), unsafe_allow_html=True)
 
     with tab_all:
         col_srch, col_sort = st.columns([3, 1])
-        search = col_srch.text_input("🔍", placeholder="Search by market or ticker…",
-                                     label_visibility="collapsed")
-        sort_by = col_sort.selectbox("Sort", ["Newest first", "Largest loss", "Largest win"],
+        search  = col_srch.text_input("s", placeholder="Search market or ticker…",
+                                      label_visibility="collapsed")
+        sort_by = col_sort.selectbox("o", ["Newest", "Biggest loss", "Biggest win"],
                                      label_visibility="collapsed")
 
         view = included.copy()
         if search.strip():
-            mask = (
+            m = (
                 view["title"].str.contains(search, case=False, na=False, regex=False)
                 | view["ticker"].str.contains(search, case=False, na=False, regex=False)
             )
-            view = view[mask]
+            view = view[m]
 
-        if sort_by == "Newest first":
-            view = view.sort_values("settled_time", ascending=False)
-        elif sort_by == "Largest loss":
-            view = view.sort_values("pnl", ascending=True)
-        else:
-            view = view.sort_values("pnl", ascending=False)
+        view = view.sort_values(
+            "settled_time" if sort_by == "Newest" else "pnl",
+            ascending=(sort_by == "Biggest loss"),
+        )
 
         st.markdown(
-            f"<p style='color:{C_MUTED};font-size:0.8rem;margin-bottom:6px'>"
-            f"{len(view):,} trades shown</p>",
+            f"<p style='font-family:\"JetBrains Mono\",monospace;color:{T['muted']};"
+            f"font-size:0.72rem;margin-bottom:8px'>{len(view):,} trades</p>",
             unsafe_allow_html=True,
         )
-        st.dataframe(format_trade_table(view), use_container_width=True, hide_index=True)
+        st.markdown(html_table(build_trade_df(view), T), unsafe_allow_html=True)
 
         if not excluded.empty:
             st.divider()
             with st.expander(
-                f"🚫  Excluded trades ({len(excluded)}) · PnL: ${excluded['pnl'].sum():,.2f}"
+                f"Excluded trades ({len(excluded)})  ·  PnL: ${excluded['pnl'].sum():,.2f}"
             ):
-                st.dataframe(
-                    format_trade_table(excluded.sort_values("settled_time", ascending=False)),
-                    use_container_width=True, hide_index=True,
-                )
+                excl_view = excluded.sort_values("settled_time", ascending=False)
+                st.markdown(html_table(build_trade_df(excl_view), T), unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
