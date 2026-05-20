@@ -240,6 +240,22 @@ code {{
     border-radius: 10px;
     padding: 28px 30px 24px;
 }}
+
+/* ── Hide "Press Enter to apply" hint (overlaps typed text) ── */
+[data-testid="InputInstructions"] {{ display: none !important; }}
+
+/* ── Radio alignment fix ── */
+.stRadio [role="radiogroup"] label {{
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    line-height: 1 !important;
+}}
+.stRadio [role="radiogroup"] label p {{
+    margin: 0 !important;
+    line-height: 1 !important;
+    padding-top: 0 !important;
+}}
 </style>
 """
 
@@ -357,7 +373,7 @@ def fetch_market_titles(creds_key: str, creds: dict, tickers: tuple) -> dict:
             pass
 
     missing = [t for t in tickers_list if t not in title_map]
-    for t in missing[:60]:
+    for t in missing[:200]:
         try:
             resp = _get(f"/markets/{t}", creds)
             if resp.status_code == 200:
@@ -389,12 +405,21 @@ _MONTHS = {
 }
 
 
+_MENTION_SUBJECTS: dict[str, str] = {
+    "NFL": "NFL", "NBA": "NBA", "NCAA": "NCAA", "NCAAM": "NCAA",
+    "NCAAF": "NCAAF", "NCAAW": "NCAAW", "MLB": "MLB", "NHL": "NHL",
+    "MAMDANI": "Mamdani", "MRBEAST": "MrBeast", "NEWSOM": "Newsom",
+    "WALZ": "Walz", "EARNINGS": "Earnings",
+}
+
+
 def parse_ticker(ticker: str) -> str:
     t = ticker.upper()
     if not t.startswith("KX"):
         return ticker
     rest = t[2:]
 
+    # ── Existing sport-game codes ──────────────────────────────────────────
     for code, sport in _SPORT_CODES:
         if rest.startswith(code):
             details = rest[len(code):].lstrip("-")
@@ -412,6 +437,76 @@ def parse_ticker(ticker: str) -> str:
                     yy, mon, dd, teams = m.groups()
                     return f"{sport} · {teams} · {result} wins ({_MONTHS.get(mon, mon)} {int(dd)}, 20{yy})"
             break
+
+    # ── Multi-variable enhanced markets ───────────────────────────────────
+    if rest.startswith("MVENBASINGLEGAME"):
+        return "NBA Single Game"
+    if rest.startswith("MVESPORTSMULTIGAME"):
+        return "Sports Multi-Game"
+    if rest.startswith("MVECROSSCATEGORY"):
+        return "Multi-Category Market"
+
+    # ── Super Bowl / event markets ─────────────────────────────────────────
+    if rest.startswith("SUPERBOWLAD-"):
+        opt = rest.split("-")[-1]
+        return f"Super Bowl Ad · {opt}"
+    if rest.startswith("NFLSBMVP-") or rest.startswith("SBMVP-"):
+        opt = rest.split("-")[-1]
+        return f"Super Bowl MVP · {opt}"
+    if rest.startswith("PERFORMSUPERBOWL") or rest.startswith("PERFSUPERBOWL"):
+        opt = rest.split("-")[-1]
+        return f"Super Bowl Performance · {opt}"
+    if rest.startswith("FIRSTSUPERBOWLSONG"):
+        opt = rest.split("-")[-1]
+        return f"Super Bowl Song · {opt}"
+    if rest.startswith("SBGUESTS"):
+        opt = rest.split("-")[-1]
+        return f"Super Bowl Guests · {opt}"
+
+    # ── Award / MVP markets ────────────────────────────────────────────────
+    if rest.startswith("NBAALLSTARMVP"):
+        opt = rest.split("-")[-1]
+        return f"NBA All-Star MVP · {opt}"
+
+    # ── Spread markets: KXNCAAMBSPREAD-26FEB14SJUPROV-SJU4 ────────────────
+    m_spread = re.match(
+        r"^(NCAAM[BW]?|NCAAF[BW]?|NFL|NBA)SPREAD-(\d{2}[A-Z]{3}\d{2})([A-Z0-9]*)-([A-Z0-9+\-]+)$",
+        rest,
+    )
+    if m_spread:
+        sport_s, date_str, teams, opt = m_spread.groups()
+        mon_m = re.match(r"\d{2}([A-Z]{3})\d{2}", date_str)
+        dd_m  = re.match(r"\d{2}[A-Z]{3}(\d{2})", date_str)
+        mon   = _MONTHS.get(mon_m.group(1), "") if mon_m else ""
+        day   = int(dd_m.group(1)) if dd_m else 0
+        base  = f"{sport_s} Spread"
+        if teams:
+            base += f" · {teams}"
+        base += f" · {opt}"
+        if mon and day:
+            base += f" ({mon} {day})"
+        return base
+
+    # ── Mention markets ────────────────────────────────────────────────────
+    if "MENTION" in rest:
+        # With game code: KXNFLMENTION-26JAN11LACNE-TUSH
+        m1 = re.match(
+            r"^([A-Z]+?)MENTION(?:[A-Z]+)?-(\d{2}[A-Z]{3}\d{2})([A-Z0-9]+)-([A-Z0-9]+)$",
+            rest,
+        )
+        if m1:
+            subj_raw, _, game, opt = m1.groups()
+            subj = _MENTION_SUBJECTS.get(subj_raw, subj_raw.title())
+            return f"{subj} Mention · {game} · {opt}"
+        # Without game code: KXMAMDANIMENTION-26JAN08-TRAN
+        m2 = re.match(
+            r"^([A-Z]+?)MENTION(?:[A-Z]+)?-(\d{2}[A-Z]{3}\d{2})-([A-Z0-9]+)$",
+            rest,
+        )
+        if m2:
+            subj_raw, _, opt = m2.groups()
+            subj = _MENTION_SUBJECTS.get(subj_raw, subj_raw.title())
+            return f"{subj} Mention · {opt}"
 
     return ticker
 
@@ -743,7 +838,12 @@ def main() -> None:
     )
 
     if "settings" not in st.session_state:
-        st.session_state.settings = load_settings()
+        settings = load_settings()
+        # URL query param takes priority — survives page refresh & server restart
+        kw_param = st.query_params.get("kw", "")
+        if kw_param:
+            settings["keywords"] = [k.strip() for k in kw_param.split(",") if k.strip()]
+        st.session_state.settings = settings
     if "creds" not in st.session_state:
         st.session_state.creds = None
     if "full_df" not in st.session_state:
@@ -832,6 +932,7 @@ def main() -> None:
                     keywords.append(kw)
                     st.session_state.settings["keywords"] = keywords
                     save_settings(st.session_state.settings)
+                    st.query_params["kw"] = ",".join(keywords)
                     st.rerun()
 
             for i, kw in enumerate(keywords[:]):
@@ -853,6 +954,10 @@ def main() -> None:
                     keywords.pop(i)
                     st.session_state.settings["keywords"] = keywords
                     save_settings(st.session_state.settings)
+                    if keywords:
+                        st.query_params["kw"] = ",".join(keywords)
+                    elif "kw" in st.query_params:
+                        del st.query_params["kw"]
                     st.rerun()
 
             if not keywords:
