@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import concurrent.futures
 import json
 import os
 import re
@@ -56,6 +57,25 @@ THEMES: dict[str, dict] = {
 
 def build_css(T: dict) -> str:
     is_dark = T["bg"] == "#050506"
+
+    # Shadows scale with theme — heavy on dark (depth), featherlight on light
+    if is_dark:
+        card_shadow   = f"0 0 0 1px {T['border']}, 0 2px 16px rgba(0,0,0,0.28)"
+        conn_shadow   = f"0 0 0 1px {T['border']}, 0 4px 28px rgba(0,0,0,0.35)"
+        info_shadow   = f"0 2px 12px rgba(0,0,0,0.20)"
+        metric_shadow = f"0 0 0 1px {T['border']}, 0 2px 16px rgba(0,0,0,0.22)"
+        hdr_icons_css = ""  # icons are white — fine on dark
+    else:
+        card_shadow   = f"0 0 0 1px {T['border']}, 0 2px 8px rgba(0,0,0,0.06)"
+        conn_shadow   = f"0 0 0 1px rgba(0,0,0,0.10), 0 2px 12px rgba(0,0,0,0.07)"
+        info_shadow   = f"0 1px 4px rgba(0,0,0,0.06)"
+        metric_shadow = f"0 0 0 1px {T['border']}, 0 2px 8px rgba(0,0,0,0.06)"
+        # light bg — force Streamlit's top-bar icons to be dark
+        hdr_icons_css = f"""
+[data-testid="stHeader"] button svg {{ fill: {T['muted']} !important; }}
+[data-testid="stHeader"] button {{ color: {T['muted']} !important; }}
+[data-testid="stHeader"] a svg {{ fill: {T['muted']} !important; }}
+"""
 
     # Radial gradient for dark; flat for light
     if is_dark:
@@ -116,6 +136,8 @@ def build_css(T: dict) -> str:
 
 /* ── Selection ── */
 ::selection {{ background: {T['accent']}44; color: {T['text']}; }}
+
+{hdr_icons_css}
 
 /* ── Base ── */
 html, body, .stApp, [data-testid="stAppViewContainer"] {{
@@ -297,8 +319,9 @@ input::-webkit-contacts-auto-fill-button {{
     font-family: 'Inter', sans-serif;
 }}
 
-/* ── Metric card hover ── */
+/* ── Metric card (default + hover) ── */
 .metric-card {{
+    box-shadow: {metric_shadow} !important;
     transition: transform 0.25s cubic-bezier(0.16,1,0.3,1),
                 box-shadow 0.25s cubic-bezier(0.16,1,0.3,1) !important;
     cursor: default;
@@ -306,8 +329,8 @@ input::-webkit-contacts-auto-fill-button {{
 .metric-card:hover {{
     transform: translateY(-3px) !important;
     box-shadow: 0 0 0 1px {T['border2']},
-                0 12px 36px rgba(0,0,0,0.45),
-                0 0 60px {T['accent']}0E !important;
+                0 12px 32px rgba(0,0,0,{"0.45" if is_dark else "0.10"}),
+                0 0 60px {T['accent']}{"0E" if is_dark else "0A"} !important;
 }}
 
 /* ── Divider ── */
@@ -339,11 +362,10 @@ code {{
 /* ── Connect card ── */
 .connect-card {{
     background: {T['card']};
-    border: 1px solid {T['border']};
+    border: 1px solid {"rgba(255,255,255,0.09)" if is_dark else "rgba(0,0,0,0.10)"};
     border-radius: 12px;
     padding: 28px 30px 26px;
-    box-shadow: 0 0 0 1px {T['border']},
-                0 4px 24px rgba(0,0,0,0.3);
+    box-shadow: {conn_shadow};
     position: relative;
     overflow: hidden;
 }}
@@ -351,16 +373,16 @@ code {{
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(to right, transparent, {T['accent']}66, transparent);
+    background: linear-gradient(to right, transparent, {T['accent']}55, transparent);
 }}
 
 /* ── Security / preview cards ── */
 .info-card {{
     background: {T['card']};
-    border: 1px solid {T['border']};
+    border: 1px solid {"rgba(255,255,255,0.07)" if is_dark else "rgba(0,0,0,0.08)"};
     border-radius: 12px;
     padding: 22px 24px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    box-shadow: {info_shadow};
     position: relative;
     overflow: hidden;
 }}
@@ -370,6 +392,35 @@ code {{
 ::-webkit-scrollbar-track {{ background: transparent; }}
 ::-webkit-scrollbar-thumb {{ background: {T['border2']}; border-radius: 2px; }}
 ::-webkit-scrollbar-thumb:hover {{ background: {T['muted']}; }}
+
+/* ── Streamlit decoration bar (hide rainbow strip) ── */
+[data-testid="stDecoration"] {{ display: none !important; }}
+
+/* ── Spinner / status widget ── */
+.stSpinner > div {{
+    border-color: {T['border2']} {T['border']} {T['border']} !important;
+    border-top-color: {T['accent']} !important;
+    width: 18px !important; height: 18px !important;
+}}
+[data-testid="stStatusWidget"],
+[data-testid="stSpinner"] > div > div {{
+    background: {T['surface']} !important;
+    border: 1px solid {T['border']} !important;
+    border-radius: 10px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,{"0.35" if is_dark else "0.10"}) !important;
+    color: {T['muted']} !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.8rem !important;
+}}
+[data-testid="stStatusWidget"] * {{
+    color: {T['muted']} !important;
+    font-family: 'Inter', sans-serif !important;
+}}
+/* Progress bar under spinner */
+[data-testid="stProgressBar"] > div {{
+    background: {T['accent']} !important;
+    border-radius: 2px !important;
+}}
 </style>
 """
 
@@ -483,35 +534,53 @@ def fetch_all_settlements(creds_key: str, creds: dict) -> tuple[list, str | None
     return settlements, None
 
 
-@st.cache_data(ttl=3600, show_spinner="Resolving market titles…")
+@st.cache_data(ttl=3600, show_spinner=False)
 def fetch_market_titles(creds_key: str, creds: dict, tickers: tuple) -> dict:
     title_map: dict = {}
     tickers_list = list(tickers)
 
-    for i in range(0, len(tickers_list), 200):
-        batch = tickers_list[i : i + 200]
-        try:
-            resp = _get("/markets", creds, {"tickers": ",".join(batch), "limit": 200})
-            if resp.status_code == 200:
-                for m in resp.json().get("markets", []):
-                    raw = m.get("title") or m.get("subtitle") or ""
-                    if raw:
-                        title_map[m["ticker"]] = normalize_market_title(raw, m["ticker"])
-        except Exception:
-            pass
+    # Batch fetch — try both repeated-param and comma-separated formats
+    for i in range(0, len(tickers_list), 100):
+        batch = tickers_list[i : i + 100]
+        for params in (
+            [("ticker", t) for t in batch] + [("limit", "100")],   # REST standard
+            {"tickers": ",".join(batch), "limit": 100},             # comma-separated
+        ):
+            try:
+                resp = _get("/markets", creds, params)
+                if resp.status_code == 200:
+                    for m in resp.json().get("markets", []):
+                        raw = m.get("title") or m.get("subtitle") or ""
+                        if raw:
+                            title_map[m["ticker"]] = normalize_market_title(
+                                raw, m["ticker"]
+                            )
+                    if title_map:   # if we got any hits, the format worked
+                        break
+            except Exception:
+                pass
 
+    # Parallel individual fallback for remaining tickers (no hard limit)
     missing = [t for t in tickers_list if t not in title_map]
-    for t in missing[:200]:
+
+    def _fetch_one(ticker_str: str) -> tuple[str, str | None]:
         try:
-            resp = _get(f"/markets/{t}", creds)
+            resp = _get(f"/markets/{ticker_str}", creds)
             if resp.status_code == 200:
                 m = resp.json().get("market", {})
                 raw = m.get("title") or m.get("subtitle") or ""
                 if raw:
-                    title_map[t] = normalize_market_title(raw, t)
+                    return ticker_str, normalize_market_title(raw, ticker_str)
         except Exception:
             pass
+        return ticker_str, None
 
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
+        for ticker_str, title in ex.map(_fetch_one, missing[:500]):
+            if title:
+                title_map[ticker_str] = title
+
+    # Final structural fallback (parse_ticker covers known patterns)
     for t in tickers_list:
         if t not in title_map:
             title_map[t] = parse_ticker(t)
@@ -655,7 +724,7 @@ def normalize_market_title(raw_title: str, ticker: str) -> str:
             return " · ".join(picks)
         return " · ".join(picks[:3]) + f"  (+{len(picks) - 3} more)"
 
-    # Game matchup: "X at/vs Y [C] Winner?"
+    # Game matchup: "X at/vs Y [C] Winner?" → "X vs Y"
     m = re.match(
         r"^(.+?)\s+(?:at|vs\.?)\s+(.+?)(?:\s+[A-Z]{1,2})?\s+Winner\??$",
         title, re.IGNORECASE,
@@ -665,12 +734,30 @@ def normalize_market_title(raw_title: str, ticker: str) -> str:
         t2 = re.sub(r"\s+[A-Z]{1,2}$", "", m.group(2).strip()).strip()
         return f"{t1} vs {t2}"
 
-    title = re.sub(r"\s+Winner\??$", "", title, flags=re.IGNORECASE).strip()
+    # Strip trailing " Winner?" / " winner" / " — Winner"
+    title = re.sub(r"[\s\-–]+Winner\??$", "", title, flags=re.IGNORECASE).strip()
 
+    # "Will X qualify for/win the Y?" — keep as-is but trim length
+    # Trim boilerplate: "Will ... be the ..." → try to shorten common patterns
+    title = re.sub(r"\s+\?$", "?", title)
+    title = re.sub(r"\s{2,}", " ", title).strip()
+
+    # "Will X win the ... [Championship|Lottery|Award]?" — abbreviate
+    m_will = re.match(
+        r"^Will\s+(.+?)\s+(?:win|qualify for|reach|advance to)\s+(.+?)[\?\.]?$",
+        title, re.IGNORECASE,
+    )
+    if m_will:
+        subject = m_will.group(1).strip()
+        event   = m_will.group(2).strip()
+        event   = re.sub(r"the\s+", "", event, flags=re.IGNORECASE).strip()
+        return f"{subject} — {event}?"
+
+    # ALL CAPS title → Title Case
     if title == title.upper() and len(title) > 4:
         title = title.title()
 
-    return re.sub(r"\s+", " ", title).strip()
+    return title.strip()
 
 
 # ── Data processing ───────────────────────────────────────────────────────────
@@ -833,7 +920,7 @@ def metric_card(label: str, value: str, sub: str, T: dict,
         f'height:100%;'
         f'position:relative;'
         f'overflow:hidden;'
-        f'box-shadow:0 0 0 1px {T["border"]},0 2px 16px rgba(0,0,0,0.22);">'
+        f'">'
         # gradient hairline at top
         f'<div style="position:absolute;top:0;left:0;right:0;height:1px;'
         f'background:linear-gradient(to right,transparent,{ac}77,transparent)"></div>'
