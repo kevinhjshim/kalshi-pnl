@@ -22,7 +22,7 @@ SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settin
 # ── Theme definitions ─────────────────────────────────────────────────────────
 THEMES: dict[str, dict] = {
     "Dark": {
-        "bg":      "#111827",   # slate-900 — easier on eyes than pure black
+        "bg":      "#111827",
         "surface": "#1F2937",
         "card":    "#1F2937",
         "border":  "#374151",
@@ -30,11 +30,11 @@ THEMES: dict[str, dict] = {
         "text":    "#F9FAFB",
         "muted":   "#9CA3AF",
         "soft":    "#D1D5DB",
-        "accent":  "#818CF8",   # indigo-400
-        "profit":  "#34D399",   # emerald-400
-        "loss":    "#F87171",   # red-400
-        "line":    "#67E8F9",   # cyan-300
-        "warn":    "#FCD34D",   # amber-300
+        "accent":  "#818CF8",
+        "profit":  "#34D399",
+        "loss":    "#F87171",
+        "line":    "#67E8F9",
+        "warn":    "#FCD34D",
     },
     "Light": {
         "bg":      "#F9FAFB",
@@ -45,11 +45,11 @@ THEMES: dict[str, dict] = {
         "text":    "#111827",
         "muted":   "#6B7280",
         "soft":    "#374151",
-        "accent":  "#6366F1",   # indigo-500
-        "profit":  "#059669",   # emerald-600
-        "loss":    "#DC2626",   # red-600
-        "line":    "#0284C7",   # sky-600
-        "warn":    "#D97706",   # amber-600
+        "accent":  "#6366F1",
+        "profit":  "#059669",
+        "loss":    "#DC2626",
+        "line":    "#0284C7",
+        "warn":    "#D97706",
     },
 }
 
@@ -154,7 +154,7 @@ input::-webkit-contacts-auto-fill-button {{
 }}
 /* Placeholder */
 .stTextInput input::placeholder, .stTextArea textarea::placeholder {{
-    color: {T['border2']} !important;
+    color: {T['muted']} !important;
 }}
 
 /* ── Selectbox ── */
@@ -231,6 +231,15 @@ code {{
 ::-webkit-scrollbar-track {{ background: {T['bg']}; }}
 ::-webkit-scrollbar-thumb {{ background: {T['border2']}; border-radius: 3px; }}
 ::-webkit-scrollbar-thumb:hover {{ background: {T['muted']}; }}
+
+/* ── Connect card ── */
+.connect-card {{
+    background: {T['card']};
+    border: 1px solid {T['border']};
+    border-top: 3px solid {T['accent']};
+    border-radius: 10px;
+    padding: 28px 30px 24px;
+}}
 </style>
 """
 
@@ -718,9 +727,9 @@ def build_yearly_df(df: pd.DataFrame) -> pd.DataFrame:
 
 def section_label(text: str, T: dict) -> None:
     st.markdown(
-        f"<p style='font-family:\"JetBrains Mono\",monospace;color:{T['muted']};"
-        f"font-size:0.6rem;text-transform:uppercase;letter-spacing:0.14em;"
-        f"margin:0 0 6px'>{ text}</p>",
+        f"<p style='font-family:\"JetBrains Mono\",monospace;color:{T['soft']};"
+        f"font-size:0.65rem;text-transform:uppercase;letter-spacing:0.08em;"
+        f"margin:0 0 6px'>{text}</p>",
         unsafe_allow_html=True,
     )
 
@@ -746,6 +755,8 @@ def main() -> None:
 
     st.markdown(build_css(T), unsafe_allow_html=True)
 
+    logged_in = bool(st.session_state.creds)
+
     # ── Sidebar ───────────────────────────────────────────────────────────────
     with st.sidebar:
         # Wordmark
@@ -755,7 +766,7 @@ def main() -> None:
             f"font-size:1.1rem;font-weight:800;color:{T['text']};letter-spacing:-0.01em'>"
             f"Kalshi PnL</div>"
             f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.58rem;"
-            f"color:{T['muted']};letter-spacing:0.14em;margin-top:2px'>"
+            f"color:{T['muted']};letter-spacing:0.06em;margin-top:2px'>"
             f"PREDICTION MARKET TRACKER</div></div>",
             unsafe_allow_html=True,
         )
@@ -774,46 +785,10 @@ def main() -> None:
             save_settings(st.session_state.settings)
             st.rerun()
 
-        st.divider()
+        if logged_in:
+            st.divider()
 
-        # ── Auth ──
-        if not st.session_state.creds:
-            section_label("Login", T)
-            auth_mode = st.radio("a", ["API Key (RSA)", "Email / Password"],
-                                 horizontal=True, label_visibility="collapsed")
-            if auth_mode == "API Key (RSA)":
-                key_id = st.text_input("Key ID", placeholder="key_xxxxxxxxxxxx")
-                pem = st.text_area("Private Key (PEM)",
-                                   placeholder="-----BEGIN RSA PRIVATE KEY-----\n...",
-                                   height=130)
-                if st.button("Connect", type="primary", use_container_width=True):
-                    if not key_id.strip() or not pem.strip():
-                        st.error("Both fields are required.")
-                    else:
-                        try:
-                            serialization.load_pem_private_key(pem.strip().encode(), password=None)
-                            st.session_state.creds = {
-                                "type": "rsa",
-                                "key_id": key_id.strip(),
-                                "private_key_pem": pem.strip(),
-                            }
-                            st.cache_data.clear()
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Invalid private key: {e}")
-            else:
-                email    = st.text_input("Email")
-                password = st.text_input("Password", type="password")
-                if st.button("Login", type="primary", use_container_width=True):
-                    with st.spinner("Authenticating…"):
-                        token, err = email_login(email, password)
-                    if token:
-                        st.session_state.creds = {"type": "bearer", "token": token}
-                        st.cache_data.clear()
-                        st.rerun()
-                    else:
-                        st.error(f"Login failed: {err}")
-        else:
+            # ── Connected badge + logout ──
             st.markdown(
                 f"<div style='background:{T['card']};border:1px solid {T['border']};"
                 f"border-left:3px solid {T['profit']};border-radius:0 6px 6px 0;"
@@ -829,106 +804,181 @@ def main() -> None:
                 st.cache_data.clear()
                 st.rerun()
 
-        st.divider()
+            st.divider()
 
-        # ── Exclusions ──
-        section_label("Exclusions", T)
-        st.markdown(
-            f"<p style='color:{T['muted']};font-size:0.78rem;line-height:1.5;margin-bottom:8px'>"
-            f"Remove trades from PnL — e.g. trades placed for a friend.</p>",
-            unsafe_allow_html=True,
-        )
-        keywords: list = st.session_state.settings.get("keywords", [])
-        full_df  = st.session_state.full_df
+            # ── Year filter ──
+            section_label("Filter", T)
+            all_years: list = st.session_state.get("all_years", [])
+            year_opts = ["All years"] + [str(y) for y in sorted(all_years, reverse=True)]
+            selected_year = st.selectbox("y", year_opts, label_visibility="collapsed")
 
-        col_a, col_b = st.columns([3, 1])
-        new_kw = col_a.text_input("kw", placeholder="e.g. NBA, NFL",
-                                  label_visibility="collapsed", key="kw_input")
-        if col_b.button("Add", use_container_width=True, key="kw_add"):
-            kw = new_kw.strip()
-            if kw and kw not in keywords:
-                keywords.append(kw)
-                st.session_state.settings["keywords"] = keywords
-                save_settings(st.session_state.settings)
-                st.rerun()
+            st.divider()
 
-        for i, kw in enumerate(keywords[:]):
-            count = keyword_match_count(full_df, kw) if not full_df.empty else 0
-            c1, c2 = st.columns([5, 1])
-            badge_color = T["loss"] if count > 0 else T["muted"]
-            c1.markdown(
-                f"<div style='background:{T['card']};border:1px solid {T['border']};"
-                f"border-left:2px solid {T['accent']};border-radius:0 4px 4px 0;"
-                f"padding:5px 10px;margin-bottom:2px'>"
-                f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.78rem;"
-                f"color:{T['text']}'>{kw}</div>"
-                f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.6rem;"
-                f"color:{badge_color}'>"
-                f"{'no matches' if count == 0 else f'{count} trades excluded'}</div></div>",
-                unsafe_allow_html=True,
-            )
-            if c2.button("×", key=f"rm_{i}"):
-                keywords.pop(i)
-                st.session_state.settings["keywords"] = keywords
-                save_settings(st.session_state.settings)
-                st.rerun()
-
-        if not keywords:
+            # ── Exclusions ──
+            section_label("Exclusions", T)
             st.markdown(
-                f"<p style='font-family:\"JetBrains Mono\",monospace;"
-                f"color:{T['muted']};font-size:0.72rem;font-style:italic'>None set.</p>",
+                f"<p style='color:{T['muted']};font-size:0.78rem;line-height:1.5;margin-bottom:8px'>"
+                f"Remove trades from PnL — e.g. trades placed for a friend.</p>",
+                unsafe_allow_html=True,
+            )
+            keywords: list = st.session_state.settings.get("keywords", [])
+            full_df  = st.session_state.full_df
+
+            new_kw = st.text_input("kw", placeholder="e.g. NBA, NFL",
+                                   label_visibility="collapsed", key="kw_input")
+            if st.button("+ Add keyword", use_container_width=True, key="kw_add"):
+                kw = new_kw.strip()
+                if kw and kw not in keywords:
+                    keywords.append(kw)
+                    st.session_state.settings["keywords"] = keywords
+                    save_settings(st.session_state.settings)
+                    st.rerun()
+
+            for i, kw in enumerate(keywords[:]):
+                count = keyword_match_count(full_df, kw) if not full_df.empty else 0
+                c1, c2 = st.columns([5, 1])
+                badge_color = T["loss"] if count > 0 else T["muted"]
+                c1.markdown(
+                    f"<div style='background:{T['card']};border:1px solid {T['border']};"
+                    f"border-left:2px solid {T['accent']};border-radius:0 4px 4px 0;"
+                    f"padding:5px 10px;margin-bottom:2px'>"
+                    f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.78rem;"
+                    f"color:{T['text']}'>{kw}</div>"
+                    f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.6rem;"
+                    f"color:{badge_color}'>"
+                    f"{'no matches' if count == 0 else f'{count} trades excluded'}</div></div>",
+                    unsafe_allow_html=True,
+                )
+                if c2.button("×", key=f"rm_{i}"):
+                    keywords.pop(i)
+                    st.session_state.settings["keywords"] = keywords
+                    save_settings(st.session_state.settings)
+                    st.rerun()
+
+            if not keywords:
+                st.markdown(
+                    f"<p style='font-family:\"JetBrains Mono\",monospace;"
+                    f"color:{T['muted']};font-size:0.72rem;font-style:italic'>None set.</p>",
+                    unsafe_allow_html=True,
+                )
+
+            st.divider()
+
+            if st.button("↺  Refresh data", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
+
+        else:
+            # Pre-login: nothing else in sidebar
+            selected_year = "All years"
+            keywords = st.session_state.settings.get("keywords", [])
+
+    # ── Pre-login main content ────────────────────────────────────────────────
+    if not logged_in:
+        # Header row
+        st.markdown(
+            f"<div style='padding:40px 0 6px'>"
+            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
+            f"font-size:1.6rem;font-weight:800;color:{T['text']};line-height:1.1;"
+            f"letter-spacing:-0.02em'>Kalshi PnL Dashboard</div>"
+            f"<p style='font-family:\"JetBrains Mono\",monospace;font-size:0.82rem;"
+            f"color:{T['muted']};margin-top:8px;line-height:1.6'>"
+            f"Analyze realized PnL by trade, market, month, and year.</p></div>",
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
+
+        col_left, col_right = st.columns([3, 2])
+
+        with col_left:
+            # Connect card
+            st.markdown(
+                f"<div class='connect-card'>"
+                f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
+                f"font-size:1.05rem;font-weight:700;color:{T['text']};margin-bottom:4px'>"
+                f"Connect your Kalshi account</div>"
+                f"<p style='font-family:\"JetBrains Mono\",monospace;font-size:0.72rem;"
+                f"color:{T['muted']};margin-bottom:20px;line-height:1.6'>"
+                f"Use your RSA API key from kalshi.com → Settings → API.</p>",
                 unsafe_allow_html=True,
             )
 
-        st.divider()
+            key_id = st.text_input("API Key ID", placeholder="key_xxxxxxxxxxxx")
+            pem = st.text_area(
+                "Private Key (PEM)",
+                placeholder="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+                height=140,
+            )
 
-        # ── Year filter ──
-        section_label("Filter", T)
-        all_years: list = st.session_state.get("all_years", [])
-        year_opts = ["All years"] + [str(y) for y in sorted(all_years, reverse=True)]
-        selected_year = st.selectbox("y", year_opts, label_visibility="collapsed")
+            if st.button("Connect", type="primary", use_container_width=True):
+                if not key_id.strip() or not pem.strip():
+                    st.error("Both fields are required.")
+                elif not pem.strip().startswith("-----BEGIN"):
+                    st.error(
+                        "Private key must start with -----BEGIN RSA PRIVATE KEY----- "
+                        "or -----BEGIN PRIVATE KEY-----"
+                    )
+                else:
+                    with st.spinner("Connecting to Kalshi…"):
+                        try:
+                            serialization.load_pem_private_key(pem.strip().encode(), password=None)
+                            st.session_state.creds = {
+                                "type": "rsa",
+                                "key_id": key_id.strip(),
+                                "private_key_pem": pem.strip(),
+                            }
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Invalid private key: {e}")
 
-        st.divider()
-        if st.button("↺  Refresh data", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+            # Close the connect-card div
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    # ── Main content ──────────────────────────────────────────────────────────
-    if not st.session_state.creds:
-        st.markdown(
-            f"<div style='padding:48px 0 24px'>"
-            f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
-            f"font-size:3rem;font-weight:800;color:{T['text']};line-height:1.05;"
-            f"letter-spacing:-0.03em'>Track your<br>"
-            f"<span style='color:{T['accent']}'>prediction edge.</span></div>"
-            f"<p style='font-family:\"JetBrains Mono\",monospace;font-size:0.82rem;"
-            f"color:{T['muted']};margin-top:16px;line-height:1.7'>"
-            f"PnL per trade · per month · per year</p></div>",
-            unsafe_allow_html=True,
-        )
-        st.divider()
-        st.markdown(
-            f"<div style='background:{T['card']};border:1px solid {T['border']};"
-            f"border-left:3px solid {T['accent']};border-radius:0 8px 8px 0;"
-            f"padding:24px 28px;max-width:400px'>"
-            f"<div style='font-family:\"JetBrains Mono\",monospace;font-size:0.6rem;"
-            f"color:{T['muted']};text-transform:uppercase;letter-spacing:0.14em;"
-            f"margin-bottom:12px'>Getting started</div>"
-            f"<ol style='color:{T['soft']};font-size:0.875rem;line-height:2.2;"
-            f"margin:0;padding-left:18px'>"
-            f"<li>Log in at <span style='color:{T['text']}'>kalshi.com</span></li>"
-            f"<li>Account → Settings → <span style='color:{T['text']}'>API</span></li>"
-            f"<li>Create an API key → copy Key ID + Private Key</li>"
-            f"<li>Paste both into the sidebar</li>"
-            f"</ol>"
-            f"<p style='font-family:\"JetBrains Mono\",monospace;font-size:0.65rem;"
-            f"color:{T['muted']};margin-top:14px;padding-top:12px;"
-            f"border-top:1px solid {T['border']}'>"
-            f"Your private key never touches disk.</p></div>",
-            unsafe_allow_html=True,
-        )
+        with col_right:
+            # Security card
+            st.markdown(
+                f"<div style='background:{T['card']};border:1px solid {T['border']};"
+                f"border-radius:10px;padding:22px 24px 20px;margin-bottom:16px'>"
+                f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
+                f"font-size:0.95rem;font-weight:700;color:{T['text']};margin-bottom:14px'>"
+                f"🔒 Security</div>"
+                f"<ul style='font-family:\"JetBrains Mono\",monospace;font-size:0.75rem;"
+                f"color:{T['soft']};line-height:2;margin:0 0 14px;padding-left:18px'>"
+                f"<li>Your private key is never stored to disk</li>"
+                f"<li>It lives in your browser session only</li>"
+                f"<li>All requests are signed locally in-memory</li>"
+                f"<li>Refreshing the page clears your credentials</li>"
+                f"<li>Open source — <a href='https://github.com/kevinhjshim/kalshi-pnl' "
+                f"target='_blank' style='color:{T['accent']};text-decoration:none'>"
+                f"review the code on GitHub</a></li>"
+                f"</ul>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            # What you'll see card
+            st.markdown(
+                f"<div style='background:{T['card']};border:1px solid {T['border']};"
+                f"border-radius:10px;padding:22px 24px 20px'>"
+                f"<div style='font-family:\"Bricolage Grotesque\",sans-serif;"
+                f"font-size:0.95rem;font-weight:700;color:{T['text']};margin-bottom:14px'>"
+                f"After connecting you'll get:</div>"
+                f"<ul style='font-family:\"JetBrains Mono\",monospace;font-size:0.75rem;"
+                f"color:{T['soft']};line-height:2.1;margin:0;padding-left:0;list-style:none'>"
+                f"<li><span style='color:{T['accent']}'>✦</span> Total realized PnL</li>"
+                f"<li><span style='color:{T['accent']}'>✦</span> Monthly &amp; yearly breakdowns</li>"
+                f"<li><span style='color:{T['accent']}'>✦</span> Per-trade cost, entry price, win/loss</li>"
+                f"<li><span style='color:{T['accent']}'>✦</span> Exclude trades placed for others</li>"
+                f"</ul>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
         return
 
+    # ── Post-login: fetch & render ────────────────────────────────────────────
     creds     = st.session_state.creds
     creds_key = creds.get("key_id") or "bearer"
 
@@ -954,7 +1004,6 @@ def main() -> None:
     st.session_state.all_years = sorted(df["year"].unique().tolist())
 
     view_df = df[df["year"] == int(selected_year)].copy() if selected_year != "All years" else df.copy()
-    keywords = st.session_state.settings.get("keywords", [])
     included, excluded = split_by_exclusions(view_df, keywords)
 
     if included.empty:
